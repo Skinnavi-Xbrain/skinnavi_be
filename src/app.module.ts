@@ -6,6 +6,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
 import { RoutinesModule } from './modules/routines/routines.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { SkinAnalysisModule } from './modules/skin-analysis/skin-analysis.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { RoutinesModule } from './modules/routines/routines.module';
     PrismaModule,
     AuthModule,
     ProductsModule,
+    UploadModule,
+    SkinAnalysisModule,
     RoutinesModule,
   ],
   controllers: [AppController],

@@ -24,7 +24,7 @@ model users {
 
 model skin_types {
   id           String           @id @default(uuid()) @db.Uuid
-  code         skin_type_enum
+  code         skin_type_enum   @unique
 
   skin_analyses skin_analyses[]
   skincare_combos skincare_combos[]
@@ -35,6 +35,7 @@ model skin_analyses {
   user_id         String        @db.Uuid
   skin_type_id    String        @db.Uuid
   overall_score   Decimal?      @db.Decimal(5,2)
+  overall_comment  String?       @db.Text
   face_image_url  String?
   created_at      DateTime      @default(now())
 
@@ -109,6 +110,7 @@ model package_allowed_combos {
 
   routine_package   routine_packages   @relation(fields: [routine_package_id], references: [id])
   combo             skincare_combos    @relation(fields: [combo_id], references: [id])
+  @@unique([routine_package_id, combo_id])
 }
 
 model user_package_subscriptions {
