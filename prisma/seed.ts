@@ -1,22 +1,74 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, user_role_enum, skin_type_enum } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+const SEED_PASSWORD = 'Password123!';
+
 async function main() {
+  // --- Seed users (USER, ADMIN, COMPANY) ---
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+  const seedUsers: Array<{
+    email: string;
+    full_name: string;
+    role: user_role_enum;
+  }> = [
+    {
+      email: 'user@skinnavi.com',
+      full_name: 'Seed User',
+      role: user_role_enum.USER,
+    },
+    {
+      email: 'admin@skinnavi.com',
+      full_name: 'Seed Admin',
+      role: user_role_enum.ADMIN,
+    },
+  ];
+  for (const u of seedUsers) {
+    await prisma.users.upsert({
+      where: { email: u.email },
+      create: {
+        email: u.email,
+        password_hash: passwordHash,
+        full_name: u.full_name,
+        role: u.role,
+      },
+      update: { full_name: u.full_name, role: u.role },
+    });
+  }
+  console.log(`Seeded ${seedUsers.length} users (password: ${SEED_PASSWORD}).`);
+
+  // --- Seed skin_types (NORMAL, DRY, COMBINATION, SENSITIVE, OILY) ---
+  const skinTypes: skin_type_enum[] = [
+    skin_type_enum.NORMAL,
+    skin_type_enum.DRY,
+    skin_type_enum.COMBINATION,
+    skin_type_enum.SENSITIVE,
+    skin_type_enum.OILY,
+  ];
+  for (const code of skinTypes) {
+    await prisma.skin_types.upsert({
+      where: { code },
+      create: { code },
+      update: {},
+    });
+  }
+  console.log(`Seeded ${skinTypes.length} skin types.`);
+
   await prisma.affiliate_products.deleteMany();
 
   const rawData = [
     // ================= NORMAL SKIN =================
     {
       name: 'SIMPLE 3-Step Skincare Combo',
-      price: 230400,
+      display_price: 230400,
       url: 'https://vn.shp.ee/WFYXhET',
       image:
         'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m4ydah1vwqxj8a.webp',
     },
     {
       name: 'Cosan Skincare Combo',
-      price: 1081000,
+      display_price: 1081000,
       url: 'https://vn.shp.ee/eYZnrzw',
       image:
         'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1fn00xfiv9b68.webp',
