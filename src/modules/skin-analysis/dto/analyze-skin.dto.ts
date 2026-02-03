@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUrl, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsUrl } from 'class-validator';
 
 export class AnalyzeSkinDto {
   @ApiProperty({
@@ -9,10 +9,4 @@ export class AnalyzeSkinDto {
   @IsString()
   @IsUrl()
   imageUrl: string;
-
-  @ApiProperty({ description: 'User ID (owner of this analysis)' })
-  @IsNotEmpty()
-  @IsString()
-  @IsUUID()
-  userId: string;
 }
