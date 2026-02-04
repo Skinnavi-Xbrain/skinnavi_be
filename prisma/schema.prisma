@@ -94,6 +94,7 @@ model routine_packages {
   id             String                     @id @default(uuid()) @db.Uuid
   package_name   String
   description    String
+  highlights     Json
   duration_days  Int
   price          Decimal                    @db.Decimal(10,2)
 
