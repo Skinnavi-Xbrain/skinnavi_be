@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 export async function seedProducts(prisma: PrismaClient) {
   const data = [
+    //Normal Skin
     {
       name: 'Hatomugi Job’s Tears Cleanser',
       usage_role: 'Cleanser',
@@ -82,6 +83,7 @@ export async function seedProducts(prisma: PrismaClient) {
         'https://down-vn.img.susercontent.com/file/sg-11134201-22120-4oat0z41xukvf0.webp',
       affiliate_url: 'https://vn.shp.ee/8oFEvmB',
     },
+    // Dry Skin
     {
       name: "L'Oreal Micellar Water",
       usage_role: 'Makeup Remover',
@@ -162,6 +164,7 @@ export async function seedProducts(prisma: PrismaClient) {
         'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lqebjt8xvp6f85.webp',
       affiliate_url: 'https://vn.shp.ee/8oFEvmB',
     },
+    // Combination Skin
     {
       name: 'COSRX Snail Mucin 96',
       usage_role: 'Essence',
@@ -242,6 +245,7 @@ export async function seedProducts(prisma: PrismaClient) {
         'https://down-vn.img.susercontent.com/file/sg-11134201-22120-4oat0z41xukvf0.webp',
       affiliate_url: 'https://vn.shp.ee/8oFEvmB',
     },
+    // Sensitive Skin
     {
       name: 'Sukin Facial Cleanser',
       usage_role: 'Cleanser',
@@ -322,6 +326,7 @@ export async function seedProducts(prisma: PrismaClient) {
         'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lqebjt8xvp6f85.webp',
       affiliate_url: 'https://vn.shp.ee/8oFEvmB',
     },
+    // Oily Skin
     {
       name: 'Banila Co Clean It Zero',
       usage_role: 'Balm',
