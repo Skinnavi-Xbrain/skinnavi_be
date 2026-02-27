@@ -259,8 +259,21 @@ If valid → return:
     "DARK_SPOTS": number
   },
   "overallComment": string,
-  "recommendedCombos": ["uuid"]
+  "recommendedCombos": ["uuid","uuid","uuid","uuid"]
 }
+
+====================
+COMBO RULES (MANDATORY):
+====================
+
+- recommendedCombos MUST NOT be empty
+- recommendedCombos MUST contain AT LEAST 4 UUIDs
+- Use ONLY UUIDs from AVAILABLE COMBOS
+- Select by:
+  1. lowest metric
+  2. skinType
+- If all metrics >= 80 → return maintenance combo
+- If no exact match → return closest by skinType
 
 ====================
 AVAILABLE COMBOS
