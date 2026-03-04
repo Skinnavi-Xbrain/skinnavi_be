@@ -5,8 +5,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const appOptions = { cors: true };
-  const app = await NestFactory.create(AppModule, appOptions);
+  const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: ['http://localhost:5173', 'https://skinnavi-frontend.vercel.app'],
+    credentials: true,
+  });
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
