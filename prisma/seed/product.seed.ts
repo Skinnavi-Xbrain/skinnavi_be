@@ -74,7 +74,7 @@ export async function seedProducts(prisma: PrismaClient) {
 
     {
       name: 'Focallure x Sanrio Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 119000,
       image_url:
         'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-ltkyzq9wox7100.webp',
@@ -82,7 +82,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'COLORKEY Luminous Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 139320,
       image_url:
         'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mfc2xluzzg9430.webp',
@@ -159,7 +159,7 @@ export async function seedProducts(prisma: PrismaClient) {
 
     {
       name: 'Carslan Micellar Cleansing Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 118419,
       image_url:
         'https://down-vn.img.susercontent.com/file/32167f9d15579b34489fb5a99b702571.webp',
@@ -167,7 +167,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'Cocoon Hau Giang Lotus Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 136400,
       image_url:
         'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mfc8jhudqfwv2f.webp',
@@ -254,7 +254,7 @@ export async function seedProducts(prisma: PrismaClient) {
 
     {
       name: 'Garnier 3-in-1 Micellar Cleansing Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 148400,
       image_url:
         'https://down-vn.img.susercontent.com/file/cn-11134207-820l4-mj51ebnoqo05e7@resize_w900_nl.webp',
@@ -263,7 +263,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'TWG Amino Acid Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 54000,
       image_url:
         'https://down-vn.img.susercontent.com/file/sg-11134201-7rdyx-mcrnedyr6zg965.webp',
@@ -350,7 +350,7 @@ export async function seedProducts(prisma: PrismaClient) {
 
     {
       name: 'SOINLAB Micellar Cleansing Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 56640,
       image_url:
         'https://down-vn.img.susercontent.com/file/sg-11134253-7rdxm-mdf3x0ncreqy13.webp',
@@ -359,7 +359,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'Bioderma Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 116000,
       image_url:
         'https://down-vn.img.susercontent.com/file/vn-11134201-820l4-mh56ba5pxc0a03.webp',
@@ -441,7 +441,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'SOINLAB Micellar Cleansing Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 56640,
       image_url:
         'https://down-vn.img.susercontent.com/file/sg-11134253-7rdxm-mdf3x0ncreqy13.webp',
@@ -450,7 +450,7 @@ export async function seedProducts(prisma: PrismaClient) {
     },
     {
       name: 'Bioderma Micellar Water',
-      usage_role: 'Micellar Water',
+      usage_role: 'Makeup Remover',
       display_price: 116000,
       image_url:
         'https://down-vn.img.susercontent.com/file/vn-11134201-820l4-mh56ba5pxc0a03.webp',

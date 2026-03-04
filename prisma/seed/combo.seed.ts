@@ -43,7 +43,7 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
         {
           name: 'Simple Micellar Cleansing Water',
-          role: 'Cleanser',
+          role: 'Makeup Remover',
           price: 75000,
           url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-T%E1%BA%A9y-Trang-Simple-Micellar-Cleansing-Water-200ml-400ml-D%E1%BB%8Bu-Nh%E1%BA%B9-Cho-Da-Nh%E1%BA%A1y-C%E1%BA%A3m-Dr-Th%C3%AAm-i.18363975.14185378989?extraParams=%7B%22display_model_id%22%3A175734350640%2C%22model_selection_logic%22%3A3%7Dr',
           img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lwjgu9nnoxjtca.webp',
@@ -77,24 +77,117 @@ export async function seedProductCombos(prisma: PrismaClient) {
           role: 'Sunscreen',
           price: 246000,
           url: 'https://shopee.vn/Kem-ch%E1%BB%91ng-n%E1%BA%AFng-Cosan-UV-Blocker-Cream-SPF50-PA-i.1074852737.20934578591',
-          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1h1aoscu82baa.webp',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-ln3xcqufvx7cdf.webp',
         },
         {
           name: 'Cosan Hydrapore Serum',
           role: 'Serum',
           price: 300000,
           url: 'https://shopee.vn/Serum-d%C6%B0%E1%BB%A1ng-ph%E1%BB%A5c-h%E1%BB%93i-Cosan-Hydrapore-Serum-i.1074852737.22434578901',
-          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1h1aoscu82baa.webp',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-ln3xcqufxbrs4d.webp',
         },
         {
           name: 'Cosan Pure Luminescence Cream',
           role: 'Sunscreen',
           price: 282240,
           url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%A1ng-tr%E1%BA%AFng-da-Cosan-Pure-Luminescence-Cream-i.1074852737.22434578902',
-          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1h1aoscu82baa.webp',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-ln3xcqufvx7cdf.webp',
         },
       ],
     },
+    {
+      skinType: 'Normal',
+      comboName: 'Prettyskin B5 Complete Skincare Set',
+      comboPrice: 1890000,
+      comboUrl:
+        'https://shopee.vn/Combo-5-s%E1%BA%A3n-ph%E1%BA%A9m-skincare-b%E1%BB%99-B5-SRM-TT-Toner-Serum-Kem-d%C6%B0%E1%BB%9Fng-B5-Prettyskin-i.737621633.22589702064',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m492gk9c7n5zdc.webp',
+      products: [
+        {
+          name: 'Prettyskin B5 Facial Cleanser',
+          role: 'Cleanser',
+          price: 380000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-B5-Prettyskin-300ml-i.737621633.25961822353',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr6wv9une21029.webp',
+        },
+        {
+          name: 'Prettyskin B5 Micellar Cleansing Water',
+          role: 'Makeup Remover',
+          price: 300000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-t%E1%BA%A9y-trang-B5-Prettyskin-500ml-i.737621633.21681840943',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lpyimty5rrqv5b.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Moisturizing Cream',
+          role: 'Moisturizer',
+          price: 450000,
+          url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%9Fng-%E1%BA%A9m-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.24380916751',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lvezpckc54el1f.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Toner',
+          role: 'Toner',
+          price: 410000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-hoa-h%E1%BB%93ng-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.25056964006',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr8c8p3ysa84c9.webp',
+        },
+        {
+          name: 'Prettyskin B5 Brightening & Recovery Serum',
+          role: 'Serum',
+          price: 450000,
+          url: 'https://shopee.vn/Serum-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-d%C6%B0%E1%BB%9Fng-s%C3%A1ng-B5-Prettyskin-50ml-i.737621633.18330485960',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lplnuxdsollnc3.webp',
+        },
+      ],
+    },
+    {
+      skinType: 'Normal',
+      comboName: 'ICESEA Tea Tree 5-Piece Skincare Combo',
+      comboPrice: 759000,
+      comboUrl:
+        'https://shopee.vn/Combo-B%E1%BB%99-5-M%C3%B3n-Ch%C4%83m-S%C3%B3c-Da-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-H%E1%BB%97-Tr%E1%BB%A3-C%E1%BA%A5p-%E1%BA%A9m-ki%E1%BB%81m-d%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-Cho-Da-i.1341250995.27614266386',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1gnfx1kw9tra0@resize_w900_nl.webp',
+      products: [
+        {
+          name: 'ICESEA Australian Tea Tree Anti-Acne Cleanser',
+          role: 'Cleanser',
+          price: 159000,
+          url: 'https://shopee.vn/s%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7-tr%E1%BB%8B-m%E1%BB%A5n-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-da-d%E1%BA%A7u-m%E1%BB%A5n-L%C3%A0m-S%E1%BA%A1ch-S%C3%A2u-Ki%E1%BB%81m-D%E1%BA%A7u-H%E1%BB%97-Tr%E1%BB%A3-Gi%E1%BA%A3m-M%E1%BB%A5n-100g-i.1341250995.27963404715',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12el1rd4ivz5d@resize_w900_nl.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Hydrating Toner',
+          role: 'Toner',
+          price: 189000,
+          url: 'https://shopee.vn/Toner-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-PURIFYING-TONER-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A4m-C%C3%82N-B%E1%BA%B0NG-PH-Thu-Nh%E1%BB%8F-Ch%C3%A2n-L%C3%B4ng-150ml-i.1341250995.27013409577',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12etwc2yun3da.webp',
+        },
+        {
+          name: 'ICESEA Hydrate Serum',
+          role: 'Serum',
+          price: 219000,
+          url: 'https://shopee.vn/La-M%C3%A3-Chamomile-l%C3%A0m-d%E1%BB%8Bu-Serum-Hydrate-C%E1%BA%A3i-thi%E1%BB%87n-m%E1%BA%B7t-%C4%91%E1%BB%8F-S%E1%BB%ADa-ch%E1%BB%AFa-h%C3%A0ng-r%C3%A0o-c%C6%A1-nh%E1%BA%A1y-c%E1%BA%A3m-Ch%C4%83m-s%C3%B3c-da-ICESEA-i.1341250995.28175369079',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m5xx5qe9pzqu55.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Lotion',
+          role: 'Moisturizer',
+          price: 189000,
+          url: 'https://shopee.vn/Lotion-Tea-tree-ICESEA-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-Ki%E1%BB%81m-D%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Thu-Nh%E1%BB%8F-L%E1%BB%97-Ch%C3%A2n-L%C3%B4ng-150g-i.1341250995.25986840896',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12ebxqh5ehr32.webp',
+        },
+        {
+          name: 'ICESEA Chamomile Brightening Cream',
+          role: 'Sunscreen',
+          price: 99000,
+          url: 'https://shopee.vn/Kem-D%C6%B0%E1%BB%A1ng-Tr%E1%BA%AFng-Da-C%C3%BAc-La-M%C3%A3-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-V%C3%A0-Ng%C4%83n-Ng%E1%BB%ABa-L%C3%A3o-H%C3%B3a-Ph%E1%BB%A5c-H%E1%BB%93i-T%C3%A1i-T%E1%BA%A1o-L%C3%A0n-Da-50g-i.1341250995.26162324982',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m0l9al6mstf1f6.webp',
+        },
+      ],
+    },
+
     // Dry skin combos
     {
       skinType: 'Dry',
@@ -145,7 +238,7 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
         {
           name: 'Prettyskin B5 Micellar Cleansing Water',
-          role: 'Cleanser',
+          role: 'Makeup Remover',
           price: 300000,
           url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-t%E1%BA%A9y-trang-B5-Prettyskin-500ml-i.737621633.21681840943',
           img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lpyimty5rrqv5b.webp',
@@ -173,6 +266,85 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
       ],
     },
+    {
+      skinType: 'Dry',
+      comboName: 'ICESEA Tea Tree 5-Piece Skincare Combo',
+      comboPrice: 759000,
+      comboUrl:
+        'https://shopee.vn/Combo-B%E1%BB%99-5-M%C3%B3n-Ch%C4%83m-S%C3%B3c-Da-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-H%E1%BB%97-Tr%E1%BB%A3-C%E1%BA%A5p-%E1%BA%A9m-ki%E1%BB%81m-d%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-Cho-Da-i.1341250995.27614266386',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1gnfx1kw9tra0@resize_w900_nl.webp',
+      products: [
+        {
+          name: 'ICESEA Australian Tea Tree Anti-Acne Cleanser',
+          role: 'Cleanser',
+          price: 159000,
+          url: 'https://shopee.vn/s%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7-tr%E1%BB%8B-m%E1%BB%A5n-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-da-d%E1%BA%A7u-m%E1%BB%A5n-L%C3%A0m-S%E1%BA%A1ch-S%C3%A2u-Ki%E1%BB%81m-D%E1%BA%A7u-H%E1%BB%97-Tr%E1%BB%A3-Gi%E1%BA%A3m-M%E1%BB%A5n-100g-i.1341250995.27963404715',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12el1rd4ivz5d@resize_w900_nl.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Hydrating Toner',
+          role: 'Toner',
+          price: 189000,
+          url: 'https://shopee.vn/Toner-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-PURIFYING-TONER-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A4m-C%C3%82N-B%E1%BA%B0NG-PH-Thu-Nh%E1%BB%8F-Ch%C3%A2n-L%C3%B4ng-150ml-i.1341250995.27013409577',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12etwc2yun3da.webp',
+        },
+        {
+          name: 'ICESEA Hydrate Serum',
+          role: 'Serum',
+          price: 219000,
+          url: 'https://shopee.vn/La-M%C3%A3-Chamomile-l%C3%A0m-d%E1%BB%8Bu-Serum-Hydrate-C%E1%BA%A3i-thi%E1%BB%87n-m%E1%BA%B7t-%C4%91%E1%BB%8F-S%E1%BB%ADa-ch%E1%BB%AFa-h%C3%A0ng-r%C3%A0o-c%C6%A1-nh%E1%BA%A1y-c%E1%BA%A3m-Ch%C4%83m-s%C3%B3c-da-ICESEA-i.1341250995.28175369079',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m5xx5qe9pzqu55.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Lotion',
+          role: 'Moisturizer',
+          price: 189000,
+          url: 'https://shopee.vn/Lotion-Tea-tree-ICESEA-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-Ki%E1%BB%81m-D%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Thu-Nh%E1%BB%8F-L%E1%BB%97-Ch%C3%A2n-L%C3%B4ng-150g-i.1341250995.25986840896',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12ebxqh5ehr32.webp',
+        },
+        {
+          name: 'ICESEA Chamomile Brightening Cream',
+          role: 'Sunscreen',
+          price: 99000,
+          url: 'https://shopee.vn/Kem-D%C6%B0%E1%BB%A1ng-Tr%E1%BA%AFng-Da-C%C3%BAc-La-M%C3%A3-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-V%C3%A0-Ng%C4%83n-Ng%E1%BB%ABa-L%C3%A3o-H%C3%B3a-Ph%E1%BB%A5c-H%E1%BB%93i-T%C3%A1i-T%E1%BA%A1o-L%C3%A0n-Da-50g-i.1341250995.26162324982',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m0l9al6mstf1f6.webp',
+        },
+      ],
+    },
+    {
+      skinType: 'Dry',
+      comboName: 'Decumar Advanced Combo',
+      comboPrice: 315000,
+      comboUrl:
+        'https://shopee.vn/Combo-Decumar-Advanced-g%E1%BB%93m-1-Gel-ng%E1%BB%ABa-m%E1%BB%A5n-01-Gel-r%E1%BB%ADa-m%E1%BA%B7t-01-kem-ch%E1%BB%91ng-n%E1%BA%AFng-gi%C3%A0nh-cho-da-m%E1%BB%A5n-DCA01-DGR01-DAV02-i.915674605.18367226371',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mhitrhziwxl0ef.webp',
+      products: [
+        {
+          name: 'Nano THC Oil-Control Acne Facial Cleanser',
+          role: 'Cleanser',
+          price: 123000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-cho-da-d%E1%BA%A7u-m%E1%BB%A5n-ngh%E1%BB%87-Nano-THC-Decumar-50g-gi%C3%BAp-s%E1%BA%A1ch-s%C3%A2u-c%C3%A2n-b%E1%BA%B1ng-%C4%91%E1%BB%99-PH-gi%E1%BA%A3m-m%E1%BB%A5n-s%C3%A1ng-da-l%C3%A0nh-t%C3%ADnh-DSM02-i.915674605.21167305061',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mhitl2gmg934fd.webp',
+        },
+        {
+          name: 'Nano Decumar Advanced Acne & Dark Spot Gel',
+          role: 'Moisturizer',
+          price: 103000,
+          url: 'https://shopee.vn/Gel-ch%E1%BA%A5m-ng%E1%BB%ABa-m%E1%BB%A5n-v%C3%A0-th%C3%A2m-Nano-Decumar-Advanced-20g-th%E1%BA%A9m-th%E1%BA%A5u-nhanh-kh%C3%B4ng-k%C3%ADch-%E1%BB%A9ng-hi%E1%BB%87u-qu%E1%BA%A3-t%E1%BB%91i-%C6%B0u-i.915674605.15295983127',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mhn0mby1d7gm45.webp',
+        },
+        {
+          name: 'Decumar Suncream Oil-Control & Tone-Up for Acne-Prone Skin',
+          role: 'Sunscreen',
+          price: 247000,
+          url: 'https://shopee.vn/Kem-ch%E1%BB%91ng-n%E1%BA%AFng-ki%E1%BB%81m-d%E1%BA%A7u-cho-da-m%E1%BB%A5n-n%C3%A2ng-tone-Suncream-Decumar-THC-SPF-50-PA-ch%C3%ADnh-h%C3%A3ng-ch%E1%BB%91ng-tr%C3%B4i-THC01-i.915674605.18167263925',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mhn0ehf57zep38.webp',
+        },
+      ],
+    },
+
     // Combination skin combos
     {
       skinType: 'Combination',
@@ -252,6 +424,85 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
       ],
     },
+    {
+      skinType: 'Combination',
+      comboName: 'Prettyskin B5 Complete Skincare Set',
+      comboPrice: 1890000,
+      comboUrl:
+        'https://shopee.vn/Combo-5-s%E1%BA%A3n-ph%E1%BA%A9m-skincare-b%E1%BB%99-B5-SRM-TT-Toner-Serum-Kem-d%C6%B0%E1%BB%9Fng-B5-Prettyskin-i.737621633.22589702064',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m492gk9c7n5zdc.webp',
+      products: [
+        {
+          name: 'Prettyskin B5 Facial Cleanser',
+          role: 'Cleanser',
+          price: 380000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-B5-Prettyskin-300ml-i.737621633.25961822353',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr6wv9une21029.webp',
+        },
+        {
+          name: 'Prettyskin B5 Micellar Cleansing Water',
+          role: 'Makeup Remover',
+          price: 300000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-t%E1%BA%A9y-trang-B5-Prettyskin-500ml-i.737621633.21681840943',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lpyimty5rrqv5b.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Moisturizing Cream',
+          role: 'Moisturizer',
+          price: 450000,
+          url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%9Fng-%E1%BA%A9m-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.24380916751',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lvezpckc54el1f.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Toner',
+          role: 'Toner',
+          price: 410000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-hoa-h%E1%BB%93ng-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.25056964006',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr8c8p3ysa84c9.webp',
+        },
+        {
+          name: 'Prettyskin B5 Brightening & Recovery Serum',
+          role: 'Serum',
+          price: 450000,
+          url: 'https://shopee.vn/Serum-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-d%C6%B0%E1%BB%9Fng-s%C3%A1ng-B5-Prettyskin-50ml-i.737621633.18330485960',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lplnuxdsollnc3.webp',
+        },
+      ],
+    },
+    {
+      skinType: 'Combination',
+      comboName: 'Men Stay Simplicity Acne Relief Skincare Trio',
+      comboPrice: 500000,
+      comboUrl:
+        'https://shopee.vn/Combo-ch%C4%83m-da-d%E1%BA%A7u-m%E1%BB%A5n-cho-nam-Men-Stay-Simplicity-Acne-Relief-Skincare-Trio-gi%E1%BA%A3m-m%E1%BB%A5n-an-to%C3%A0n-i.118768792.11535989197',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mj1l607uzbpj4c.webp',
+      products: [
+        {
+          name: 'Men Stay Simplicity Facial Cleanser',
+          role: 'Cleanser',
+          price: 153000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-cho-nam-s%E1%BA%A1ch-d%E1%BA%A7u-nh%E1%BB%9Dn-ng%E1%BB%ABa-m%E1%BB%A5n-Men-Stay-Simplicity-Facial-Cleanser-100g-i.118768792.1853741392',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjo0cneke41v97@resize_w900_nl.webp',
+        },
+        {
+          name: 'Men Stay Simplicity Calm Skin Relief Facial Serum',
+          role: 'Serum',
+          price: 102000,
+          url: 'https://shopee.vn/Serum-gi%E1%BA%A3m-m%E1%BB%A5n-l%C3%A0m-d%E1%BB%8Bu-da-cho-nam-Men-Stay-Simplicity-Calm-Skin-Relief-Facial-Serum-10ml-30ml-i.118768792.5142070330',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjo0gwmvhh4z02.webp',
+        },
+        {
+          name: 'Men Stay Simplicity Facial Moisturizer 5-in-1',
+          role: 'Moisturizer',
+          price: 229000,
+          url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%A1ng-%E1%BA%A9m-cho-nam-%C4%91a-n%C4%83ng-ki%E1%BB%83m-so%C3%A1t-d%E1%BA%A7u-nh%E1%BB%9Dn-5-in-1-Men-Stay-Simplicity-Facial-Moisturizer-80g-i.118768792.1853722073',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mjk5179c5m9t83.webp',
+        },
+      ],
+    },
+
     // Sensitive skin combos
     {
       skinType: 'Sensitive',
@@ -331,6 +582,52 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
       ],
     },
+    {
+      skinType: 'Sensitive',
+      comboName: 'Prettyskin B5 Complete Skincare Set',
+      comboPrice: 1890000,
+      comboUrl:
+        'https://shopee.vn/Combo-5-s%E1%BA%A3n-ph%E1%BA%A9m-skincare-b%E1%BB%99-B5-SRM-TT-Toner-Serum-Kem-d%C6%B0%E1%BB%9Fng-B5-Prettyskin-i.737621633.22589702064',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m492gk9c7n5zdc.webp',
+      products: [
+        {
+          name: 'Prettyskin B5 Facial Cleanser',
+          role: 'Cleanser',
+          price: 380000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-B5-Prettyskin-300ml-i.737621633.25961822353',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr6wv9une21029.webp',
+        },
+        {
+          name: 'Prettyskin B5 Micellar Cleansing Water',
+          role: 'Makeup Remover',
+          price: 300000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-t%E1%BA%A9y-trang-B5-Prettyskin-500ml-i.737621633.21681840943',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lpyimty5rrqv5b.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Moisturizing Cream',
+          role: 'Moisturizer',
+          price: 450000,
+          url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%9Fng-%E1%BA%A9m-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.24380916751',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lvezpckc54el1f.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Toner',
+          role: 'Toner',
+          price: 410000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-hoa-h%E1%BB%93ng-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.25056964006',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr8c8p3ysa84c9.webp',
+        },
+        {
+          name: 'Prettyskin B5 Brightening & Recovery Serum',
+          role: 'Serum',
+          price: 450000,
+          url: 'https://shopee.vn/Serum-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-d%C6%B0%E1%BB%9Fng-s%C3%A1ng-B5-Prettyskin-50ml-i.737621633.18330485960',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lplnuxdsollnc3.webp',
+        },
+      ],
+    },
     // Oily skin combos
     {
       skinType: 'Oily',
@@ -382,7 +679,7 @@ export async function seedProductCombos(prisma: PrismaClient) {
         },
         {
           name: 'Centella Foaming Facial Cleanser',
-          role: 'Cleanser',
+          role: 'Makeup Remover',
           price: 120000,
           url: 'https://shopee.vn/S%E1%BB%AFa-R%E1%BB%ADa-M%E1%BA%B7t-T%E1%BA%A1o-B%E1%BB%8Dt-Cho-Da-D%E1%BA%A7u-M%E1%BB%A5n-M%E1%BB%81m-M%E1%BB%8Bn-L%C3%A0m-S%E1%BA%A1ch-S%C3%A2u-Rau-M%C3%A1-C%E1%BB%8F-M%E1%BB%81m-150ml-i.134371556.28114336061',
           img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1h1aoscu82baa.webp',
@@ -400,6 +697,98 @@ export async function seedProductCombos(prisma: PrismaClient) {
           price: 355000,
           url: 'https://shopee.vn/Kem-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Da-M%E1%BA%B7t-Ki%E1%BB%81m-D%E1%BA%A7u-Ng%E1%BB%ABa-M%E1%BB%A5n-Chi%E1%BA%BFt-Xu%E1%BA%A5t-Rau-M%C3%A1-Cho-Da-D%E1%BA%A7u-Nh%E1%BA%A1y-C%E1%BA%A3m-C%E1%BB%8F-M%E1%BB%81m-50g-i.134371556.18452057440',
           img: 'https://down-vn.img.susercontent.com/file/vn-11134207-820l4-mha0hh4w47pma0.webp',
+        },
+      ],
+    },
+    {
+      skinType: 'Dry',
+      comboName: 'Prettyskin B5 Complete Skincare Set',
+      comboPrice: 1890000,
+      comboUrl:
+        'https://shopee.vn/Combo-5-s%E1%BA%A3n-ph%E1%BA%A9m-skincare-b%E1%BB%99-B5-SRM-TT-Toner-Serum-Kem-d%C6%B0%E1%BB%9Fng-B5-Prettyskin-i.737621633.22589702064',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m492gk9c7n5zdc.webp',
+      products: [
+        {
+          name: 'Prettyskin B5 Facial Cleanser',
+          role: 'Cleanser',
+          price: 380000,
+          url: 'https://shopee.vn/S%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7t-B5-Prettyskin-300ml-i.737621633.25961822353',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr6wv9une21029.webp',
+        },
+        {
+          name: 'Prettyskin B5 Micellar Cleansing Water',
+          role: 'Makeup Remover',
+          price: 300000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-t%E1%BA%A9y-trang-B5-Prettyskin-500ml-i.737621633.21681840943',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lpyimty5rrqv5b.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Moisturizing Cream',
+          role: 'Moisturizer',
+          price: 450000,
+          url: 'https://shopee.vn/Kem-d%C6%B0%E1%BB%9Fng-%E1%BA%A9m-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.24380916751',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lvezpckc54el1f.webp',
+        },
+        {
+          name: 'Prettyskin B5 Recovery Toner',
+          role: 'Toner',
+          price: 410000,
+          url: 'https://shopee.vn/N%C6%B0%E1%BB%9Bc-hoa-h%E1%BB%93ng-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-B5-Prettyskin-i.737621633.25056964006',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lr8c8p3ysa84c9.webp',
+        },
+        {
+          name: 'Prettyskin B5 Brightening & Recovery Serum',
+          role: 'Serum',
+          price: 450000,
+          url: 'https://shopee.vn/Serum-gi%C3%BAp-ph%E1%BB%A5c-h%E1%BB%93i-d%C6%B0%E1%BB%9Fng-s%C3%A1ng-B5-Prettyskin-50ml-i.737621633.18330485960',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7r98o-lplnuxdsollnc3.webp',
+        },
+      ],
+    },
+    {
+      skinType: 'Oily',
+      comboName: 'ICESEA Tea Tree 5-Piece Skincare Combo',
+      comboPrice: 759000,
+      comboUrl:
+        'https://shopee.vn/Combo-B%E1%BB%99-5-M%C3%B3n-Ch%C4%83m-S%C3%B3c-Da-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-H%E1%BB%97-Tr%E1%BB%A3-C%E1%BA%A5p-%E1%BA%A9m-ki%E1%BB%81m-d%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-Cho-Da-i.1341250995.27614266386',
+      comboImg:
+        'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m1gnfx1kw9tra0@resize_w900_nl.webp',
+      products: [
+        {
+          name: 'ICESEA Australian Tea Tree Anti-Acne Cleanser',
+          role: 'Cleanser',
+          price: 159000,
+          url: 'https://shopee.vn/s%E1%BB%AFa-r%E1%BB%ADa-m%E1%BA%B7-tr%E1%BB%8B-m%E1%BB%A5n-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-ICESEA-da-d%E1%BA%A7u-m%E1%BB%A5n-L%C3%A0m-S%E1%BA%A1ch-S%C3%A2u-Ki%E1%BB%81m-D%E1%BA%A7u-H%E1%BB%97-Tr%E1%BB%A3-Gi%E1%BA%A3m-M%E1%BB%A5n-100g-i.1341250995.27963404715',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12el1rd4ivz5d@resize_w900_nl.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Hydrating Toner',
+          role: 'Toner',
+          price: 189000,
+          url: 'https://shopee.vn/Toner-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-PURIFYING-TONER-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A4m-C%C3%82N-B%E1%BA%B0NG-PH-Thu-Nh%E1%BB%8F-Ch%C3%A2n-L%C3%B4ng-150ml-i.1341250995.27013409577',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12etwc2yun3da.webp',
+        },
+        {
+          name: 'ICESEA Hydrate Serum',
+          role: 'Serum',
+          price: 219000,
+          url: 'https://shopee.vn/La-M%C3%A3-Chamomile-l%C3%A0m-d%E1%BB%8Bu-Serum-Hydrate-C%E1%BA%A3i-thi%E1%BB%87n-m%E1%BA%B7t-%C4%91%E1%BB%8F-S%E1%BB%ADa-ch%E1%BB%AFa-h%C3%A0ng-r%C3%A0o-c%C6%A1-nh%E1%BA%A1y-c%E1%BA%A3m-Ch%C4%83m-s%C3%B3c-da-ICESEA-i.1341250995.28175369079',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m5xx5qe9pzqu55.webp',
+        },
+        {
+          name: 'ICESEA Tea Tree Lotion',
+          role: 'Moisturizer',
+          price: 189000,
+          url: 'https://shopee.vn/Lotion-Tea-tree-ICESEA-Tr%C3%A0m-Tr%C3%A0-%C3%9Ac-Ki%E1%BB%81m-D%E1%BA%A7u-Gi%E1%BA%A3m-M%E1%BB%A5n-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-Thu-Nh%E1%BB%8F-L%E1%BB%97-Ch%C3%A2n-L%C3%B4ng-150g-i.1341250995.25986840896',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m12ebxqh5ehr32.webp',
+        },
+        {
+          name: 'ICESEA Chamomile Brightening Cream',
+          role: 'Sunscreen',
+          price: 99000,
+          url: 'https://shopee.vn/Kem-D%C6%B0%E1%BB%A1ng-Tr%E1%BA%AFng-Da-C%C3%BAc-La-M%C3%A3-ICESEA-D%C6%B0%E1%BB%A1ng-%E1%BA%A8m-V%C3%A0-Ng%C4%83n-Ng%E1%BB%ABa-L%C3%A3o-H%C3%B3a-Ph%E1%BB%A5c-H%E1%BB%93i-T%C3%A1i-T%E1%BA%A1o-L%C3%A0n-Da-50g-i.1341250995.26162324982',
+          img: 'https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m0l9al6mstf1f6.webp',
         },
       ],
     },
