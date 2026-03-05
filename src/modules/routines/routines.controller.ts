@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoutinesService } from './routines.service';
 import { CreateRoutineDto } from './dto/create-routine.dto';
@@ -28,5 +28,14 @@ export class RoutinesController {
   async getByUser(@GetUser('userId') userId: string) {
     const data = await this.routinesService.getLatestRoutineByUser(userId);
     return new SimpleResponse(data, 'Get routine by user', 200);
+  }
+
+  // return detailed information for a single step (product + sub steps)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('')
+  @Get('steps/:id')
+  async getStepDetail(@Param('id') id: string): Promise<SimpleResponse<any>> {
+    const data = await this.routinesService.getStepDetail(id);
+    return new SimpleResponse(data, 'Get routine step detail', 200);
   }
 }

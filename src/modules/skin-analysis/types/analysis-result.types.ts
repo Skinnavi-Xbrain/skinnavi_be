@@ -19,6 +19,11 @@ export interface RoutineStep {
   title: string;
   howTo: string;
   products: string[]; // affiliate_products.id (UUID)
+  subSteps?: {
+    title: string;
+    howTo: string;
+    imageUrls: string[];
+  }[];
 }
 
 export interface RoutinePart {

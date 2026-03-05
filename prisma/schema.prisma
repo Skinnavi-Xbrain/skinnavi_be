@@ -150,6 +150,19 @@ model user_routine_steps {
 
   user_routine    user_routines       @relation(fields: [user_routine_id], references: [id])
   product         affiliate_products? @relation(fields: [product_id], references: [id])
+
+  // new relation for sub-steps
+  sub_steps       user_routine_sub_steps[]
+}
+
+model user_routine_sub_steps {
+  id                   String              @id @default(uuid()) @db.Uuid
+  user_routine_step_id String              @db.Uuid
+  title                String
+  how_to               String?
+  image_url            String?
+
+  user_routine_step    user_routine_steps  @relation(fields: [user_routine_step_id], references: [id])
 }
 
 model routine_daily_logs {

@@ -129,6 +129,7 @@ npm run db:reset:seed   # Reset DB + seed it again from scratch
 - 🔄 Always run `npx prisma migrate dev` after pulling new changes
 - 🐳 Docker is used **only for infrastructure** (PostgreSQL)
 - 💻 Backend runs **locally**, not inside Docker
+- 📌 **New:** `GET /routines/steps/:id` returns a step with its product and an array of sub‑steps (title, howTo, 4 image URLs) for detailed view.
 
 ---
 
