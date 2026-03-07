@@ -10,21 +10,58 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, skin_metric_enum } from '@prisma/client';
 import crypto from 'crypto';
 import { AIAnalysisResult, analysisResultSchema } from './skin-analysis.schema';
+import { ApiKeyManagerService } from '../../common/aipKeyManager/api-key-manager.service';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
 @Injectable()
 export class SkinAnalysisService {
-  private ai: GoogleGenAI;
   private readonly logger = new Logger(SkinAnalysisService.name);
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
-  ) {
-    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (!apiKey) throw new Error('GEMINI_API_KEY is required');
-    this.ai = new GoogleGenAI({ apiKey });
+    private apiKeyManager: ApiKeyManagerService,
+  ) {}
+
+  private async generateContentWithRetry(modelName: string, params: any) {
+    let attempts = 0;
+    const maxAttempts = this.apiKeyManager.totalKeys;
+
+    while (attempts < maxAttempts) {
+      const apiKey = this.apiKeyManager.getCurrentKey();
+
+      const ai = new GoogleGenAI({
+        apiKey,
+      });
+
+      try {
+        return await ai.models.generateContent({
+          model: modelName,
+          ...params,
+        });
+      } catch (error: any) {
+        if (
+          error?.status === 429 ||
+          error?.message?.includes('429') ||
+          error?.message?.toLowerCase().includes('quota')
+        ) {
+          this.logger.warn(
+            `API Key index ${attempts} exhausted. Switching to next key...`,
+          );
+
+          this.apiKeyManager.getNextKey();
+          attempts++;
+        } else {
+          this.logger.error(`AI Generation error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    throw new BadRequestException(
+      'All GEMINI API keys have exceeded their quota for today.',
+    );
   }
 
   async analyzeImage(imageUrl: string, userId: string) {
@@ -41,12 +78,22 @@ export class SkinAnalysisService {
       include: { metrics: true, skin_type: true },
     });
 
-    if (cached) return this.mapAnalysisToResponse(cached);
-
     const combos = await this.prisma.skincare_combos.findMany({
       where: { is_active: true },
       select: { id: true, combo_name: true, skin_type_id: true },
     });
+
+    if (cached) {
+      const response = this.mapAnalysisToResponse(cached);
+
+      const recommendedCombos = combos
+        .filter((c) => c.skin_type_id === cached.skin_type_id)
+        .slice(0, 4)
+        .map((c) => c.id);
+
+      response.result.recommendedCombos = recommendedCombos;
+      return response;
+    }
 
     const comboListText = combos
       .map((c) => `- id: ${c.id}, name: ${c.combo_name}`)
@@ -66,17 +113,16 @@ export class SkinAnalysisService {
       previousAnalysisText,
     );
 
-    const aiRes = await this.ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const aiRes = await this.generateContentWithRetry(GEMINI_MODEL, {
       contents: createUserContent([
         { inlineData: { mimeType, data: imageBase64 } },
         prompt,
       ]),
       config: {
         responseMimeType: 'application/json',
-        temperature: 0,
-        topP: 0.1,
-        topK: 1,
+        temperature: 0.1,
+        topP: 0.3,
+        topK: 20,
       },
     });
 
@@ -99,7 +145,7 @@ export class SkinAnalysisService {
 
     const recommendedCombos = combos
       .filter((c) => c.skin_type_id === skinType.id)
-      .slice(0, 3)
+      .slice(0, 4)
       .map((c) => c.id);
 
     const analysis = await this.prisma.$transaction(async (tx) => {
@@ -166,7 +212,7 @@ ${Object.entries(metrics)
         overallScore: Number(analysis.overall_score),
         metrics,
         overallComment: analysis.overall_comment,
-        recommendedCombos: [],
+        recommendedCombos: [] as string[],
         isValidImage: true,
       },
     };
@@ -186,10 +232,19 @@ ${Object.entries(metrics)
       .replace(/```json/gi, '')
       .replace(/```/g, '')
       .trim();
+
+    this.logger.debug('AI RAW RESPONSE: ' + cleaned);
+
     const json = JSON.parse(cleaned);
+
     const parsed = analysisResultSchema.safeParse(json);
 
     if (!parsed.success) {
+      this.logger.error(
+        'AI VALIDATION ERROR: ' +
+          JSON.stringify(parsed.error.format(), null, 2),
+      );
+
       throw new BadRequestException('AI response validation failed');
     }
 
@@ -234,26 +289,36 @@ Rules:
 PHASE 1 — IMAGE VALIDATION
 ====================
 
-Reject if:
-- Face < 60%
-- Blurry / low resolution
-- Too dark / overexposed
-- Strong shadow
-- Multiple faces
-- Obstructed
-- Not a real human face
+Check if the image is suitable for facial skin analysis.
+
+The image MUST satisfy ALL conditions below:
+
+1. Face is clearly visible and centered
+2. Face occupies at least 60% of the image
+3. Image is sharp and not blurry
+4. Lighting is sufficient and even
+5. No harsh shadows on the face
+6. Only ONE face in the image
+7. No glasses, mask, or accessories covering skin
+8. Skin areas (forehead, cheeks, nose, chin) are visible
+9. Expression is neutral (no exaggerated smile or distortion)
+10. The image shows a real human face
+
+Reject the image if ANY condition fails.
 
 If invalid → return ONLY:
 
 {
   "isValidImage": false,
   "imageUrl": "${imageUrl}",
-  "message": "short clear reason",
+  "message": "Short reason why the image cannot be analyzed",
   "guidelines": [
-    "Ensure face is centered and large.",
-    "Use good lighting.",
-    "Avoid glasses or obstruction.",
-    "Keep neutral expression."
+    "Ensure your face is centered and clearly visible in the frame.",
+    "Make sure your face occupies most of the photo.",
+    "Use good natural lighting and avoid strong shadows.",
+    "Remove glasses, masks, or any accessories.",
+    "Keep a neutral facial expression.",
+    "Avoid blurry or low-resolution photos."
   ]
 }
 

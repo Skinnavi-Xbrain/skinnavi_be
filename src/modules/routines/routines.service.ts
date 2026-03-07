@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
+import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -16,10 +17,43 @@ export class RoutinesService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private apiKeyManager: ApiKeyManagerService,
   ) {
-    const apiKey = this.config.get<string>('GEMINI_API_KEY');
-    if (!apiKey) throw new Error('GEMINI_API_KEY is required');
+    const apiKey = this.apiKeyManager.getCurrentKey();
     this.ai = new GoogleGenAI({ apiKey });
+  }
+
+  private async generateContentWithRetry(
+    modelName: string,
+    contentParams: any,
+  ) {
+    let attempts = 0;
+    while (attempts < this.apiKeyManager.totalKeys) {
+      const apiKey = this.apiKeyManager.getCurrentKey();
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+      });
+
+      try {
+        return await ai.models.generateContent({
+          model: modelName,
+          contents: contentParams,
+        });
+      } catch (error: any) {
+        if (
+          error?.status === 429 ||
+          error?.message?.includes('429') ||
+          error?.message?.toLowerCase().includes('quota')
+        ) {
+          this.apiKeyManager.getNextKey();
+          attempts++;
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw new BadRequestException('All API keys exhausted');
   }
 
   async createRoutine(params: {
@@ -107,16 +141,9 @@ export class RoutinesService {
     - No markdown, no explanation.
     `;
 
-    const res = await this.ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0,
-        topP: 0.1,
-        topK: 1,
-      },
-    });
+    const res = await this.generateContentWithRetry(GEMINI_MODEL, [
+      { role: 'user', parts: [{ text: prompt }] },
+    ]);
 
     const raw =
       (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;

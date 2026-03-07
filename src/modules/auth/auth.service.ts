@@ -118,7 +118,7 @@ export class AuthService {
     const hash = await bcrypt.hash(rt, 10);
     await this.prisma.users.update({
       where: { id: userId },
-      data: { hashed_refresh_token: hash } as any, // Ép kiểu vì schema chưa có trường này
+      data: { hashed_refresh_token: hash } as any,
     });
   }
 
@@ -127,11 +127,11 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get('JWT_ACCESS_SECRETKEY'),
-        expiresIn: '15m', // Access token ngắn hạn
+        expiresIn: this.configService.get('JWT_ACTIVATE_EXPIRES'),
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get('JWT_REFRESH_SECRETKEY'),
-        expiresIn: '7d', // Refresh token dài hạn
+        expiresIn: this.configService.get('JWT_REFRESH_EXPIRES'),
       }),
     ]);
 
