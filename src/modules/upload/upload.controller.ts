@@ -40,12 +40,10 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('image'))
   async uploadImage(
     @UploadedFile()
-    file: { buffer: Buffer; size: number; mimetype: string } | undefined,
+    file: Express.Multer.File,
   ): Promise<SimpleResponse<{ url: string; publicId: string }>> {
     if (!file?.buffer) {
-      throw new BadRequestException(
-        'No file provided. Use field name "image".',
-      );
+      throw new BadRequestException('No file provided.');
     }
     if (file.size > MAX_FILE_SIZE) {
       throw new BadRequestException(
@@ -57,10 +55,14 @@ export class UploadController {
         `Invalid type. Allowed: ${ALLOWED_MIMES.join(', ')}`,
       );
     }
-    const result = await this.uploadService.uploadImage(file.buffer);
+    const result = await this.uploadService.uploadImage(file.buffer, {
+      name: file.originalname,
+      mimetype: file.mimetype,
+    });
+
     return new SimpleResponse(
-      { url: result.secureUrl, publicId: result.publicId },
-      'Image uploaded successfully.',
+      { url: result.url, publicId: result.publicId },
+      'Image uploaded to Drive successfully.',
       201,
     );
   }
