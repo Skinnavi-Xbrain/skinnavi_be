@@ -4,7 +4,6 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI, createUserContent } from '@google/genai';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, skin_metric_enum } from '@prisma/client';
@@ -19,7 +18,6 @@ export class SkinAnalysisService {
   private readonly logger = new Logger(SkinAnalysisService.name);
 
   constructor(
-    private configService: ConfigService,
     private prisma: PrismaService,
     private apiKeyManager: ApiKeyManagerService,
   ) {}
@@ -66,14 +64,14 @@ export class SkinAnalysisService {
 
   async analyzeImage(imageUrl: string, userId: string) {
     const imageBase64 = await this.fetchImageAsBase64(imageUrl);
-    const mimeType = inferMimeType(imageUrl);
+    const mimeType = this.inferMimeType(imageUrl);
 
     const imageHash = crypto
       .createHash('sha256')
       .update(imageBase64)
       .digest('hex');
 
-    const cached = await this.prisma.skin_analyses.findFirst({
+    const existingAnalysis = await this.prisma.skin_analyses.findFirst({
       where: { image_hash: imageHash },
       include: { metrics: true, skin_type: true },
     });
@@ -83,15 +81,54 @@ export class SkinAnalysisService {
       select: { id: true, combo_name: true, skin_type_id: true },
     });
 
-    if (cached) {
-      const response = this.mapAnalysisToResponse(cached);
+    if (existingAnalysis) {
+      if (existingAnalysis.user_id === userId) {
+        const response = this.mapAnalysisToResponse(existingAnalysis);
+        response.result.recommendedCombos = combos
+          .filter((c) => c.skin_type_id === existingAnalysis.skin_type_id)
+          .slice(0, 4)
+          .map((c) => c.id);
+        return response;
+      }
 
-      const recommendedCombos = combos
-        .filter((c) => c.skin_type_id === cached.skin_type_id)
+      this.logger.log(
+        `Image hash match found from another user. Cloning results for user: ${userId}`,
+      );
+
+      const clonedAnalysis = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.skin_analyses.create({
+          data: {
+            user_id: userId,
+            skin_type_id: existingAnalysis.skin_type_id,
+            overall_score: existingAnalysis.overall_score,
+            overall_comment: existingAnalysis.overall_comment,
+            face_image_url: imageUrl,
+            image_hash: imageHash,
+          },
+        });
+
+        await tx.skin_analysis_metrics.createMany({
+          data: existingAnalysis.metrics.map((m) => ({
+            skin_analysis_id: created.id,
+            metric_type: m.metric_type,
+            score: m.score,
+          })),
+        });
+
+        return created;
+      });
+
+      const response = this.mapAnalysisToResponse({
+        ...clonedAnalysis,
+        metrics: existingAnalysis.metrics,
+        skin_type: existingAnalysis.skin_type,
+      });
+
+      response.result.recommendedCombos = combos
+        .filter((c) => c.skin_type_id === clonedAnalysis.skin_type_id)
         .slice(0, 4)
         .map((c) => c.id);
 
-      response.result.recommendedCombos = recommendedCombos;
       return response;
     }
 
@@ -106,7 +143,6 @@ export class SkinAnalysisService {
     });
 
     const previousAnalysisText = this.buildPreviousAnalysisText(last);
-
     const prompt = buildAnalysisPrompt(
       comboListText,
       imageUrl,
@@ -127,7 +163,6 @@ export class SkinAnalysisService {
     });
 
     const text = aiRes.text ?? aiRes.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!text) throw new BadRequestException('AI returned empty');
 
     const result = this.parseAIResponse(text);
@@ -178,6 +213,13 @@ export class SkinAnalysisService {
         recommendedCombos,
       },
     };
+  }
+
+  private inferMimeType(url: string): string {
+    const lower = url.toLowerCase();
+    if (lower.includes('png')) return 'image/png';
+    if (lower.includes('webp')) return 'image/webp';
+    return 'image/jpeg';
   }
 
   private buildPreviousAnalysisText(last: any) {
@@ -432,11 +474,4 @@ STRICT RULES
 - NO null
 - NO extra text
 `;
-}
-
-function inferMimeType(url: string): string {
-  const lower = url.toLowerCase();
-  if (lower.includes('png')) return 'image/png';
-  if (lower.includes('webp')) return 'image/webp';
-  return 'image/jpeg';
 }

@@ -34,7 +34,7 @@ model skin_types {
 model skin_analyses {
   id              String        @id @default(uuid()) @db.Uuid
   user_id         String        @db.Uuid
-  image_hash      String?       @unique
+  image_hash      String?       
   skin_type_id    String        @db.Uuid
   overall_score   Decimal?      @db.Decimal(5,2)
   overall_comment  String?       @db.Text
