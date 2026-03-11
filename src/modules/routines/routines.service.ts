@@ -61,9 +61,12 @@ export class RoutinesService {
     skinAnalysisId: string;
     routinePackageId: string;
     comboId: string;
+    isTrial?: boolean; // Flag xác định gói dùng thử miễn phí
   }) {
-    const { userId, skinAnalysisId, routinePackageId, comboId } = params;
+    const { userId, skinAnalysisId, routinePackageId, comboId, isTrial } =
+      params;
 
+    // 1. Kiểm tra dữ liệu đầu vào
     const analysis = await this.prisma.skin_analyses.findFirst({
       where: { id: skinAnalysisId, user_id: userId },
       include: { metrics: true, skin_type: true },
@@ -77,28 +80,59 @@ export class RoutinesService {
 
     const combo = await this.prisma.skincare_combos.findUnique({
       where: { id: comboId },
-      include: {
-        combo_products: { include: { product: true } },
-      },
+      include: { combo_products: { include: { product: true } } },
     });
     if (!combo || !combo.combo_products.length) {
       throw new BadRequestException('Combo has no products');
     }
 
-    const start = new Date();
-    const end = new Date(start);
-    end.setDate(end.getDate() + pkg.duration_days);
+    // 2. Xử lý Subscription
+    let subscription;
 
-    const subscription = await this.prisma.user_package_subscriptions.create({
-      data: {
-        user_id: userId,
-        routine_package_id: routinePackageId,
-        selected_combo_id: comboId,
-        start_date: start,
-        end_date: end,
-      },
-    });
+    if (isTrial) {
+      // Logic cho gói Dùng thử (Free Trial): Tạo mới subscription ngay lập tức
+      // Trước tiên, vô hiệu hóa các gói đang active cũ (nếu có)
+      await this.prisma.user_package_subscriptions.updateMany({
+        where: {
+          user_id: userId,
+          end_date: { gt: new Date() },
+        },
+        data: { end_date: new Date() }, // Kết thúc gói cũ ngay lập tức
+      });
 
+      const start = new Date();
+      const end = new Date(start);
+      end.setDate(end.getDate() + pkg.duration_days);
+
+      subscription = await this.prisma.user_package_subscriptions.create({
+        data: {
+          user_id: userId,
+          routine_package_id: routinePackageId,
+          selected_combo_id: comboId,
+          start_date: start,
+          end_date: end,
+        },
+      });
+    } else {
+      // Logic cho gói Trả phí: Tìm subscription đã được tạo và kích hoạt từ PaymentsService (qua IPN)
+      subscription = await this.prisma.user_package_subscriptions.findFirst({
+        where: {
+          user_id: userId,
+          routine_package_id: routinePackageId,
+          selected_combo_id: comboId,
+          end_date: { gt: new Date() }, // Phải còn hạn (đã thanh toán thành công)
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      if (!subscription) {
+        throw new BadRequestException(
+          'No active subscription found for this package. Please complete payment first.',
+        );
+      }
+    }
+
+    // 3. Chuẩn bị dữ liệu cho AI
     const metricsText = analysis.metrics
       .map((m) => `${m.metric_type}: ${m.score}`)
       .join(', ');

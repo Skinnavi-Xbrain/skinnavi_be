@@ -10,6 +10,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { SkinAnalysisModule } from './modules/skin-analysis/skin-analysis.module';
 import { RoutinePackagesModule } from './modules/routine-packages/routine-packages.module';
 import { CombosModule } from './modules/combos/combos.module';
+import { PaymentsModule } from './modules/payments/payment.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CombosModule } from './modules/combos/combos.module';
     SkinAnalysisModule,
     RoutinePackagesModule,
     RoutinesModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
