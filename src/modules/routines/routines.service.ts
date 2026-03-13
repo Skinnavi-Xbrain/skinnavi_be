@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
 
@@ -16,7 +15,6 @@ export class RoutinesService {
 
   constructor(
     private prisma: PrismaService,
-    private config: ConfigService,
     private apiKeyManager: ApiKeyManagerService,
   ) {
     const apiKey = this.apiKeyManager.getCurrentKey();
@@ -61,78 +59,61 @@ export class RoutinesService {
     skinAnalysisId: string;
     routinePackageId: string;
     comboId: string;
-    isTrial?: boolean; // Flag xác định gói dùng thử miễn phí
   }) {
-    const { userId, skinAnalysisId, routinePackageId, comboId, isTrial } =
-      params;
+    const { userId, skinAnalysisId, routinePackageId, comboId } = params;
 
-    // 1. Kiểm tra dữ liệu đầu vào
     const analysis = await this.prisma.skin_analyses.findFirst({
       where: { id: skinAnalysisId, user_id: userId },
       include: { metrics: true, skin_type: true },
     });
-    if (!analysis) throw new NotFoundException('Skin analysis not found');
 
-    const pkg = await this.prisma.routine_packages.findUnique({
-      where: { id: routinePackageId },
-    });
-    if (!pkg) throw new NotFoundException('Package not found');
+    if (!analysis) {
+      throw new NotFoundException('Skin analysis not found');
+    }
 
     const combo = await this.prisma.skincare_combos.findUnique({
       where: { id: comboId },
       include: { combo_products: { include: { product: true } } },
     });
+
     if (!combo || !combo.combo_products.length) {
       throw new BadRequestException('Combo has no products');
     }
 
-    // 2. Xử lý Subscription
-    let subscription;
-
-    if (isTrial) {
-      // Logic cho gói Dùng thử (Free Trial): Tạo mới subscription ngay lập tức
-      // Trước tiên, vô hiệu hóa các gói đang active cũ (nếu có)
-      await this.prisma.user_package_subscriptions.updateMany({
+    const subscription = await this.prisma.user_package_subscriptions.findFirst(
+      {
         where: {
           user_id: userId,
+          routine_package_id: routinePackageId,
+          selected_combo_id: comboId,
+          is_active: true,
           end_date: { gt: new Date() },
         },
-        data: { end_date: new Date() }, // Kết thúc gói cũ ngay lập tức
-      });
-
-      const start = new Date();
-      const end = new Date(start);
-      end.setDate(end.getDate() + pkg.duration_days);
-
-      subscription = await this.prisma.user_package_subscriptions.create({
-        data: {
-          user_id: userId,
-          routine_package_id: routinePackageId,
-          selected_combo_id: comboId,
-          start_date: start,
-          end_date: end,
-        },
-      });
-    } else {
-      // Logic cho gói Trả phí: Tìm subscription đã được tạo và kích hoạt từ PaymentsService (qua IPN)
-      subscription = await this.prisma.user_package_subscriptions.findFirst({
-        where: {
-          user_id: userId,
-          routine_package_id: routinePackageId,
-          selected_combo_id: comboId,
-          end_date: { gt: new Date() }, // Phải còn hạn (đã thanh toán thành công)
+        include: {
+          routine_package: true,
         },
         orderBy: { created_at: 'desc' },
-      });
+      },
+    );
 
-      if (!subscription) {
-        throw new BadRequestException(
-          'No active subscription found for this package. Please complete payment first.',
-        );
-      }
+    if (!subscription) {
+      throw new BadRequestException(
+        'No active subscription found. Please subscribe to the package first.',
+      );
     }
 
-    // 3. Chuẩn bị dữ liệu cho AI
+    const existingRoutine = await this.prisma.user_routines.findFirst({
+      where: {
+        user_package_subscription_id: subscription.id,
+      },
+    });
+
+    if (existingRoutine && !subscription.routine_package.allow_tracking) {
+      throw new BadRequestException(
+        'Your package allows routine creation only once. Please upgrade to track progress.',
+      );
+    }
+
     const metricsText = analysis.metrics
       .map((m) => `${m.metric_type}: ${m.score}`)
       .join(', ');
@@ -181,13 +162,16 @@ export class RoutinesService {
 
     const raw =
       (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!raw) throw new BadRequestException('AI did not return JSON');
 
     const cleaned = raw
       .replace(/^```json\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
+
     let parsed: any;
+
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -223,22 +207,22 @@ export class RoutinesService {
         });
 
         if (productInfo?.usage_role) {
-          const instructionTemplate =
+          const template =
             await this.prisma.product_usage_instructions.findUnique({
               where: { usage_role: productInfo.usage_role },
-              include: { sub_steps: { orderBy: { step_order: 'asc' } } },
+              include: {
+                sub_steps: { orderBy: { step_order: 'asc' } },
+              },
             });
 
-          if (instructionTemplate && instructionTemplate.sub_steps.length > 0) {
-            const subStepsData = instructionTemplate.sub_steps.map((ss) => ({
-              user_routine_step_id: createdStep.id,
-              title: ss.title,
-              how_to: ss.how_to,
-              image_url: ss.image_url,
-            }));
-
+          if (template?.sub_steps?.length) {
             await this.prisma.user_routine_sub_steps.createMany({
-              data: subStepsData,
+              data: template.sub_steps.map((ss) => ({
+                user_routine_step_id: createdStep.id,
+                title: ss.title,
+                how_to: ss.how_to,
+                image_url: ss.image_url,
+              })),
             });
           }
         }

@@ -115,15 +115,17 @@ model combo_products {
 }
 
 model routine_packages {
-  id             String                     @id @default(uuid()) @db.Uuid
-  package_name   String
-  description    String
-  highlights     Json
-  duration_days  Int
-  price          Decimal                    @db.Decimal(10,2)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  package_name       String
+  description        String
+  highlights         Json
+  duration_days      Int
+  price              Decimal                    @db.Decimal(10,2)
+  weekly_scan_limit  Int
+  allow_tracking     Boolean
 
-  allowed_combos package_allowed_combos[]
-  subscriptions  user_package_subscriptions[]
+  allowed_combos     package_allowed_combos[]
+  subscriptions      user_package_subscriptions[]
 }
 
 model package_allowed_combos {

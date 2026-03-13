@@ -1,4 +1,4 @@
-import { IsUUID, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
+import { IsUUID, IsNotEmpty } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsUUID()
@@ -8,8 +8,4 @@ export class CreatePaymentDto {
   @IsUUID()
   @IsNotEmpty()
   comboId: string;
-
-  @IsOptional()
-  @IsBoolean()
-  forceCreate?: boolean;
 }

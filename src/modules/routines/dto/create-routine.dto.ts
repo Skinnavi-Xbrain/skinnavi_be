@@ -1,4 +1,4 @@
-import { IsBoolean, IsUUID } from 'class-validator';
+import { IsUUID } from 'class-validator';
 
 export class CreateRoutineDto {
   @IsUUID()
@@ -9,7 +9,4 @@ export class CreateRoutineDto {
 
   @IsUUID()
   comboId: string;
-
-  @IsBoolean()
-  isTrial: boolean;
 }

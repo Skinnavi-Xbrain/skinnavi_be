@@ -4,10 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import * as crypto from 'crypto';
 import { format } from 'date-fns';
 import { payment_status_enum } from '@prisma/client';
-import {
-  EligibilityResponse,
-  CreatePaymentResponse,
-} from './dto/payment-response.dto';
+import { EligibilityResponse } from './dto/payment-response.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -18,44 +15,37 @@ export class PaymentsService {
     private configService: ConfigService,
   ) {}
 
-  /**
-   * API 1: Kiểm tra xem user có cần thanh toán hay không
-   * Kết hợp kiểm tra end_date và trường is_active
-   */
   async checkEligibility(
     userId: string,
     packageId: string,
   ): Promise<EligibilityResponse> {
-    // 1. Kiểm tra gói đang hoạt động (phải còn hạn VÀ is_active = true)
-    const activeSub = await this.prisma.user_package_subscriptions.findFirst({
-      where: {
-        user_id: userId,
-        is_active: true,
-        end_date: { gt: new Date() },
-      },
-      include: { routine_package: true },
-      orderBy: { end_date: 'desc' },
-    });
-
-    // 2. Kiểm tra thông tin gói mục tiêu
     const targetPkg = await this.prisma.routine_packages.findUnique({
       where: { id: packageId },
     });
+
     if (!targetPkg) throw new NotFoundException('Package not found');
 
-    // 3. Kiểm tra user mới hoàn toàn (chưa từng có bất kỳ subscription nào)
-    const hasEverSubscribed =
-      await this.prisma.user_package_subscriptions.findFirst({
-        where: { user_id: userId },
-      });
+    const now = new Date();
 
-    // Logic Free Trial: User chưa từng subscribe + Chọn gói <= 7 ngày
-    const isEligibleForFreeTrial =
-      !hasEverSubscribed && targetPkg.duration_days <= 7;
+    const subscriptions = await this.prisma.user_package_subscriptions.findMany(
+      {
+        where: { user_id: userId },
+        include: { routine_package: true },
+        orderBy: { end_date: 'desc' },
+      },
+    );
+
+    const activeSub = subscriptions.find(
+      (sub) => sub.is_active && sub.end_date > now,
+    );
+
+    const hasEverSubscribed = subscriptions.length > 0;
+    const isFreeTrial = !hasEverSubscribed && targetPkg.duration_days <= 7;
+    const requiresPayment = !isFreeTrial && Number(targetPkg.price) > 0;
 
     return {
-      requiresPayment: !isEligibleForFreeTrial && Number(targetPkg.price) > 0,
-      isFreeTrial: isEligibleForFreeTrial,
+      isFreeTrial,
+      requiresPayment,
       hasActivePackage: !!activeSub,
       currentPackage: activeSub
         ? {
@@ -66,68 +56,36 @@ export class PaymentsService {
     };
   }
 
-  /**
-   * API 3: Tạo link thanh toán hoặc xử lý gói Free Trial
-   */
   async createPaymentUrl(
     userId: string,
     packageId: string,
     comboId: string,
     ip: string,
-    forceCreate: boolean = false,
-  ): Promise<CreatePaymentResponse | string> {
-    // 1. Kiểm tra logic ghi đè gói đang active
-    const eligibility = await this.checkEligibility(userId, packageId);
-
-    // if (eligibility.hasActivePackage && !forceCreate) {
-    //   return {
-    //     hasActivePackage: true,
-    //     currentPackage: eligibility.currentPackage,
-    //     message:
-    //       'You currently have an active package. Do you want to replace it with the new one?',
-    //   };
-    // }
-
-    // 2. Kiểm tra thông tin gói cước mới
+  ): Promise<string> {
     const pkg = await this.prisma.routine_packages.findUnique({
       where: { id: packageId },
     });
+
     if (!pkg) throw new NotFoundException('Package not found');
 
-    // 3. Xử lý logic thay đổi gói: Nếu xác nhận tạo mới (forceCreate), tắt các gói cũ
-    if (forceCreate) {
-      await this.prisma.user_package_subscriptions.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user_package_subscriptions.updateMany({
         where: {
           user_id: userId,
           is_active: true,
         },
-        data: {
-          is_active: false,
-        },
+        data: { is_active: false },
       });
-      this.logger.log(
-        `Deactivated old packages for user ${userId} due to forceCreate`,
-      );
-    }
+    });
 
-    // 4. Xử lý gói FREE TRIAL
-    if (eligibility.isFreeTrial) {
-      return {
-        isFreeTrial: true,
-        message:
-          'Congratulations! You are eligible for a free trial. Your routine will be created immediately.',
-      };
-    }
-
-    // 5. Tạo Subscription và Payment (Mặc định is_active vẫn là true theo DB schema của bạn)
     const subscription = await this.prisma.user_package_subscriptions.create({
       data: {
         user_id: userId,
         routine_package_id: packageId,
         selected_combo_id: comboId,
         start_date: new Date(),
-        end_date: new Date(), // Sẽ cập nhật khi IPN thành công
-        is_active: true,
+        end_date: new Date(),
+        is_active: false,
       },
     });
 
@@ -143,9 +101,38 @@ export class PaymentsService {
     return this.generateVnpayUrl(payment.id, pkg.price, ip);
   }
 
-  /**
-   * Xử lý IPN từ VNPAY
-   */
+  async createFreeTrial(userId: string, packageId: string, comboId: string) {
+    const pkg = await this.prisma.routine_packages.findUnique({
+      where: { id: packageId },
+    });
+
+    if (!pkg) throw new NotFoundException('Package not found');
+
+    const startDate = new Date();
+
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + pkg.duration_days);
+
+    await this.prisma.user_package_subscriptions.updateMany({
+      where: {
+        user_id: userId,
+        is_active: true,
+      },
+      data: { is_active: false },
+    });
+
+    return this.prisma.user_package_subscriptions.create({
+      data: {
+        user_id: userId,
+        routine_package_id: packageId,
+        selected_combo_id: comboId,
+        start_date: startDate,
+        end_date: endDate,
+        is_active: true,
+      },
+    });
+  }
+
   async handleVnpayIpn(query: any) {
     const secretKey = this.configService.get<string>('VNP_HASH_SECRET')?.trim();
     if (!secretKey)
@@ -216,8 +203,6 @@ export class PaymentsService {
       return { RspCode: '00', Message: 'Success' };
     }
   }
-
-  // --- Helper Methods ---
 
   private async generateVnpayUrl(
     paymentId: string,

@@ -17,13 +17,26 @@ import type { Request } from 'express';
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @Get('check-eligibility')
+  @Get('eligibility')
   @UseGuards(JwtAuthGuard)
-  async check(
+  async checkEligibility(
     @GetUser('id') userId: string,
     @Query('packageId') packageId: string,
   ) {
     return this.paymentsService.checkEligibility(userId, packageId);
+  }
+
+  @Post('free-trial')
+  @UseGuards(JwtAuthGuard)
+  async createFreeTrial(
+    @GetUser('id') userId: string,
+    @Body() dto: CreatePaymentDto,
+  ) {
+    return this.paymentsService.createFreeTrial(
+      userId,
+      dto.packageId,
+      dto.comboId,
+    );
   }
 
   @Post('create-url')
@@ -35,12 +48,14 @@ export class PaymentsController {
   ) {
     const ip =
       req.ip || req.headers['x-forwarded-for']?.toString() || '127.0.0.1';
+
     const url = await this.paymentsService.createPaymentUrl(
       userId,
       dto.packageId,
       dto.comboId,
       ip,
     );
+
     return { url };
   }
 

@@ -22,6 +22,64 @@ export class SkinAnalysisService {
     private apiKeyManager: ApiKeyManagerService,
   ) {}
 
+  async checkAnalysisLimit(userId: string) {
+    const now = new Date();
+
+    // 1. Lấy gói dịch vụ đang hoạt động
+    const activeSub = await this.prisma.user_package_subscriptions.findFirst({
+      where: { user_id: userId, is_active: true, end_date: { gt: now } },
+      include: { routine_package: true },
+    });
+
+    if (!activeSub) {
+      throw new BadRequestException(
+        'Bạn cần đăng ký gói dịch vụ để sử dụng tính năng này.',
+      );
+    }
+
+    const duration = activeSub.routine_package.duration_days;
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); // Tính từ Chủ Nhật
+
+    // 2. Đếm số lần đã phân tích
+    const totalAnalyses = await this.prisma.skin_analyses.count({
+      where: { user_id: userId, created_at: { gte: activeSub.start_date } },
+    });
+
+    const weeklyAnalyses = await this.prisma.skin_analyses.count({
+      where: { user_id: userId, created_at: { gte: startOfWeek } },
+    });
+
+    // 3. Kiểm tra logic theo gói
+    if (duration <= 7) {
+      if (totalAnalyses >= 1)
+        throw new BadRequestException(
+          'Gói 1 tuần chỉ hỗ trợ phân tích 1 lần duy nhất.',
+        );
+    } else if (duration <= 30) {
+      if (weeklyAnalyses >= 3)
+        throw new BadRequestException(
+          'Gói 1 tháng giới hạn 3 lần phân tích/tuần.',
+        );
+    } else if (duration <= 90) {
+      if (weeklyAnalyses >= 5)
+        throw new BadRequestException(
+          'Gói 3 tháng giới hạn 5 lần phân tích/tuần.',
+        );
+    }
+
+    // 4. Kiểm tra giới hạn 1 lần/ngày (Chống spam)
+    const todayAnalysis = await this.prisma.skin_analyses.findFirst({
+      where: {
+        user_id: userId,
+        created_at: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+      },
+    });
+    if (todayAnalysis)
+      throw new BadRequestException(
+        'Bạn chỉ có thể phân tích da 1 lần mỗi ngày.',
+      );
+  }
+
   private async generateContentWithRetry(modelName: string, params: any) {
     let attempts = 0;
     const maxAttempts = this.apiKeyManager.totalKeys;
@@ -83,12 +141,9 @@ export class SkinAnalysisService {
 
     if (existingAnalysis) {
       if (existingAnalysis.user_id === userId) {
-        const response = this.mapAnalysisToResponse(existingAnalysis);
-        response.result.recommendedCombos = combos
-          .filter((c) => c.skin_type_id === existingAnalysis.skin_type_id)
-          .slice(0, 4)
-          .map((c) => c.id);
-        return response;
+        throw new BadRequestException(
+          'You have already uploaded this image. Please upload a new skin photo.',
+        );
       }
 
       this.logger.log(
@@ -222,6 +277,15 @@ export class SkinAnalysisService {
     return 'image/jpeg';
   }
 
+  private async fetchImageAsBase64(imageUrl: string) {
+    const res = await fetch(imageUrl);
+    if (!res.ok) {
+      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+    }
+    const buf = await res.arrayBuffer();
+    return Buffer.from(buf).toString('base64');
+  }
+
   private buildPreviousAnalysisText(last: any) {
     if (!last) return 'NO_PREVIOUS_ANALYSIS';
 
@@ -260,14 +324,14 @@ ${Object.entries(metrics)
     };
   }
 
-  private async fetchImageAsBase64(imageUrl: string) {
-    const res = await fetch(imageUrl);
-    if (!res.ok) {
-      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
-    }
-    const buf = await res.arrayBuffer();
-    return Buffer.from(buf).toString('base64');
-  }
+  // private async fetchImageAsBase64(imageUrl: string) {
+  //   const res = await fetch(imageUrl);
+  //   if (!res.ok) {
+  //     throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+  //   }
+  //   const buf = await res.arrayBuffer();
+  //   return Buffer.from(buf).toString('base64');
+  // }
 
   private parseAIResponse(text: string): AIAnalysisResult {
     const cleaned = text
