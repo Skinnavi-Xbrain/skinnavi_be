@@ -115,15 +115,17 @@ model combo_products {
 }
 
 model routine_packages {
-  id             String                     @id @default(uuid()) @db.Uuid
-  package_name   String
-  description    String
-  highlights     Json
-  duration_days  Int
-  price          Decimal                    @db.Decimal(10,2)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  package_name       String
+  description        String
+  highlights         Json
+  duration_days      Int
+  price              Decimal                    @db.Decimal(10,2)
+  weekly_scan_limit  Int
+  allow_tracking     Boolean
 
-  allowed_combos package_allowed_combos[]
-  subscriptions  user_package_subscriptions[]
+  allowed_combos     package_allowed_combos[]
+  subscriptions      user_package_subscriptions[]
 }
 
 model package_allowed_combos {
@@ -143,6 +145,7 @@ model user_package_subscriptions {
   selected_combo_id  String             @db.Uuid
   start_date         DateTime           @db.Date
   end_date           DateTime           @db.Date
+  is_active          Boolean            @default(true)
   created_at         DateTime           @default(now())
 
   user               users              @relation(fields: [user_id], references: [id])
@@ -206,15 +209,17 @@ model affiliate_click_logs {
 }
 
 model payments {
-  id              String    @id @default(uuid()) @db.Uuid
-  user_id         String    @db.Uuid
-  subscription_id String    @db.Uuid
-  amount          Decimal   @db.Decimal(10,2)
-  status          String?
-  created_at      DateTime  @default(now())
+  id                 String                      @id @default(uuid()) @db.Uuid
+  user_id            String                      @db.Uuid
+  subscription_id    String                      @db.Uuid
+  amount             Decimal                     @db.Decimal(10,2)
+  vnp_TransactionNo  String? 
+  vnp_OrderInfo      String? 
+  status             payment_status_enum         @default(PENDING)
+  created_at         DateTime                    @default(now())
 
-  user            users                     @relation(fields: [user_id], references: [id])
-  subscription    user_package_subscriptions @relation(fields: [subscription_id], references: [id])
+  user               users                       @relation(fields: [user_id], references: [id])
+  subscription       user_package_subscriptions  @relation(fields: [subscription_id], references: [id])
 }
 
 enum user_role_enum {
@@ -241,4 +246,10 @@ enum skin_metric_enum {
 enum routine_time_enum {
   MORNING
   EVENING
+}
+
+enum payment_status_enum {
+  PENDING
+  SUCCESS
+  FAILED
 }

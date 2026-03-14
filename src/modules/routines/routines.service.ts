@@ -1,10 +1,10 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
 
@@ -13,10 +13,10 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 @Injectable()
 export class RoutinesService {
   private ai: GoogleGenAI;
+  private readonly logger = new Logger(RoutinesService.name);
 
   constructor(
     private prisma: PrismaService,
-    private config: ConfigService,
     private apiKeyManager: ApiKeyManagerService,
   ) {
     const apiKey = this.apiKeyManager.getCurrentKey();
@@ -68,36 +68,53 @@ export class RoutinesService {
       where: { id: skinAnalysisId, user_id: userId },
       include: { metrics: true, skin_type: true },
     });
-    if (!analysis) throw new NotFoundException('Skin analysis not found');
 
-    const pkg = await this.prisma.routine_packages.findUnique({
-      where: { id: routinePackageId },
-    });
-    if (!pkg) throw new NotFoundException('Package not found');
+    if (!analysis) {
+      throw new NotFoundException('Skin analysis not found');
+    }
 
     const combo = await this.prisma.skincare_combos.findUnique({
       where: { id: comboId },
-      include: {
-        combo_products: { include: { product: true } },
-      },
+      include: { combo_products: { include: { product: true } } },
     });
+
     if (!combo || !combo.combo_products.length) {
       throw new BadRequestException('Combo has no products');
     }
 
-    const start = new Date();
-    const end = new Date(start);
-    end.setDate(end.getDate() + pkg.duration_days);
+    const subscription = await this.prisma.user_package_subscriptions.findFirst(
+      {
+        where: {
+          user_id: userId,
+          routine_package_id: routinePackageId,
+          selected_combo_id: comboId,
+          is_active: true,
+          end_date: { gt: new Date() },
+        },
+        include: {
+          routine_package: true,
+        },
+        orderBy: { created_at: 'desc' },
+      },
+    );
 
-    const subscription = await this.prisma.user_package_subscriptions.create({
-      data: {
-        user_id: userId,
-        routine_package_id: routinePackageId,
-        selected_combo_id: comboId,
-        start_date: start,
-        end_date: end,
+    if (!subscription) {
+      throw new BadRequestException(
+        'No active subscription found. Please subscribe to the package first.',
+      );
+    }
+
+    const existingRoutine = await this.prisma.user_routines.findFirst({
+      where: {
+        user_package_subscription_id: subscription.id,
       },
     });
+
+    if (existingRoutine && !subscription.routine_package.allow_tracking) {
+      throw new BadRequestException(
+        'Your package allows routine creation only once. Please upgrade to track progress.',
+      );
+    }
 
     const metricsText = analysis.metrics
       .map((m) => `${m.metric_type}: ${m.score}`)
@@ -147,13 +164,16 @@ export class RoutinesService {
 
     const raw =
       (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!raw) throw new BadRequestException('AI did not return JSON');
 
     const cleaned = raw
       .replace(/^```json\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
+
     let parsed: any;
+
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -189,22 +209,22 @@ export class RoutinesService {
         });
 
         if (productInfo?.usage_role) {
-          const instructionTemplate =
+          const template =
             await this.prisma.product_usage_instructions.findUnique({
               where: { usage_role: productInfo.usage_role },
-              include: { sub_steps: { orderBy: { step_order: 'asc' } } },
+              include: {
+                sub_steps: { orderBy: { step_order: 'asc' } },
+              },
             });
 
-          if (instructionTemplate && instructionTemplate.sub_steps.length > 0) {
-            const subStepsData = instructionTemplate.sub_steps.map((ss) => ({
-              user_routine_step_id: createdStep.id,
-              title: ss.title,
-              how_to: ss.how_to,
-              image_url: ss.image_url,
-            }));
-
+          if (template?.sub_steps?.length) {
             await this.prisma.user_routine_sub_steps.createMany({
-              data: subStepsData,
+              data: template.sub_steps.map((ss) => ({
+                user_routine_step_id: createdStep.id,
+                title: ss.title,
+                how_to: ss.how_to,
+                image_url: ss.image_url,
+              })),
             });
           }
         }
@@ -290,5 +310,86 @@ export class RoutinesService {
       throw new NotFoundException('Routine step not found');
     }
     return step;
+  }
+
+  async getUserSkinAnalyses(userId: string, days: number = 7) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(start.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+
+    const skinAnalyses = await this.prisma.skin_analyses.findMany({
+      where: {
+        user_id: userId,
+        created_at: { gte: start },
+      },
+      include: {
+        skin_type: true,
+        metrics: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (skinAnalyses.length < 2) {
+      return {
+        user_id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        skin_analyses: [],
+        start_date: start.toISOString().split('T')[0],
+        end_date: end.toISOString().split('T')[0],
+        message: `At least 2 analyses are required between ${
+          start.toISOString().split('T')[0]
+        } and ${end.toISOString().split('T')[0]}`,
+      };
+    }
+
+    const analyzesWithTrend: any[] = [];
+    for (let i = 0; i < skinAnalyses.length; i++) {
+      const current = skinAnalyses[i];
+      const previous = skinAnalyses[i + 1];
+
+      let scoreTrend: number | null = null;
+      if (current.overall_score && previous?.overall_score) {
+        scoreTrend =
+          Number(current.overall_score) - Number(previous.overall_score);
+      }
+
+      analyzesWithTrend.push({
+        id: current.id,
+        skin_type_code: current.skin_type.code,
+        overall_score: current.overall_score
+          ? Number(current.overall_score)
+          : null,
+        overall_comment: current.overall_comment,
+        created_at: current.created_at.toISOString(),
+        face_image_url: current.face_image_url,
+        overall_score_trend: scoreTrend,
+        metrics: current.metrics.map((m) => ({
+          metric_type: m.metric_type,
+          score: m.score ? Number(m.score) : null,
+        })),
+      });
+    }
+
+    return {
+      user_id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      start_date: start.toISOString().split('T')[0],
+      end_date: end.toISOString().split('T')[0],
+      skin_analyses: analyzesWithTrend,
+    };
   }
 }

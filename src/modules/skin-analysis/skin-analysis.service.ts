@@ -22,6 +22,85 @@ export class SkinAnalysisService {
     private apiKeyManager: ApiKeyManagerService,
   ) {}
 
+  async checkAnalysisLimit(userId: string) {
+    const now = new Date();
+
+    const todayAnalysis = await this.prisma.skin_analyses.findFirst({
+      where: {
+        user_id: userId,
+        created_at: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+      },
+    });
+
+    if (todayAnalysis) {
+      throw new BadRequestException(
+        'You have already performed a skin analysis today. Please try again tomorrow.',
+      );
+    }
+
+    const activeSub = await this.prisma.user_package_subscriptions.findFirst({
+      where: {
+        user_id: userId,
+        is_active: true,
+        end_date: { gt: now },
+      },
+      include: { routine_package: true },
+    });
+
+    if (!activeSub) {
+      return;
+    }
+
+    const duration = activeSub.routine_package.duration_days;
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const totalAnalyses = await this.prisma.skin_analyses.count({
+      where: {
+        user_id: userId,
+        created_at: { gte: activeSub.start_date, lte: activeSub.end_date },
+      },
+    });
+
+    const weeklyAnalyses = await this.prisma.skin_analyses.count({
+      where: {
+        user_id: userId,
+        created_at: { gte: startOfWeek },
+      },
+    });
+
+    if (duration <= 7) {
+      if (totalAnalyses >= 1) {
+        throw new BadRequestException(
+          'The Free Trial allows only 1 skin analysis. Please upgrade to a paid package for more analyses.',
+        );
+      }
+    } else if (duration <= 30) {
+      if (weeklyAnalyses >= 3) {
+        throw new BadRequestException(
+          'The Essential Routine allows only 3 analyses per week. Please wait until next week or upgrade to the Advanced Routine for more frequent analyses.',
+        );
+      }
+    } else if (duration <= 90) {
+      if (weeklyAnalyses >= 5) {
+        throw new BadRequestException(
+          'The Advanced Routine allows only 5 analyses per week. Please wait until next week for more analyses.',
+        );
+      }
+    }
+
+    this.logger.debug({
+      startDate: activeSub.start_date,
+      endDate: activeSub.end_date,
+      totalAnalyses,
+      duration: activeSub.routine_package.duration_days,
+    });
+  }
+
   private async generateContentWithRetry(modelName: string, params: any) {
     let attempts = 0;
     const maxAttempts = this.apiKeyManager.totalKeys;
@@ -83,12 +162,9 @@ export class SkinAnalysisService {
 
     if (existingAnalysis) {
       if (existingAnalysis.user_id === userId) {
-        const response = this.mapAnalysisToResponse(existingAnalysis);
-        response.result.recommendedCombos = combos
-          .filter((c) => c.skin_type_id === existingAnalysis.skin_type_id)
-          .slice(0, 4)
-          .map((c) => c.id);
-        return response;
+        throw new BadRequestException(
+          'You have already uploaded this image. Please upload a new skin photo.',
+        );
       }
 
       this.logger.log(
@@ -222,6 +298,15 @@ export class SkinAnalysisService {
     return 'image/jpeg';
   }
 
+  private async fetchImageAsBase64(imageUrl: string) {
+    const res = await fetch(imageUrl);
+    if (!res.ok) {
+      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+    }
+    const buf = await res.arrayBuffer();
+    return Buffer.from(buf).toString('base64');
+  }
+
   private buildPreviousAnalysisText(last: any) {
     if (!last) return 'NO_PREVIOUS_ANALYSIS';
 
@@ -260,14 +345,14 @@ ${Object.entries(metrics)
     };
   }
 
-  private async fetchImageAsBase64(imageUrl: string) {
-    const res = await fetch(imageUrl);
-    if (!res.ok) {
-      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
-    }
-    const buf = await res.arrayBuffer();
-    return Buffer.from(buf).toString('base64');
-  }
+  // private async fetchImageAsBase64(imageUrl: string) {
+  //   const res = await fetch(imageUrl);
+  //   if (!res.ok) {
+  //     throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+  //   }
+  //   const buf = await res.arrayBuffer();
+  //   return Buffer.from(buf).toString('base64');
+  // }
 
   private parseAIResponse(text: string): AIAnalysisResult {
     const cleaned = text
