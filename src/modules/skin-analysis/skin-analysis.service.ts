@@ -345,15 +345,6 @@ ${Object.entries(metrics)
     };
   }
 
-  // private async fetchImageAsBase64(imageUrl: string) {
-  //   const res = await fetch(imageUrl);
-  //   if (!res.ok) {
-  //     throw new BadRequestException(`Cannot fetch image: ${res.status}`);
-  //   }
-  //   const buf = await res.arrayBuffer();
-  //   return Buffer.from(buf).toString('base64');
-  // }
-
   private parseAIResponse(text: string): AIAnalysisResult {
     const cleaned = text
       .replace(/```json/gi, '')
@@ -376,6 +367,79 @@ ${Object.entries(metrics)
     }
 
     return parsed.data;
+  }
+
+  async getUserSkinAnalyses(userId: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const skinAnalysis = await this.prisma.skin_analyses.findFirst({
+      where: {
+        user_id: userId,
+      },
+      include: {
+        skin_type: true,
+        metrics: true,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    if (!skinAnalysis) {
+      return {
+        user_id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        skin_analysis: null,
+        message: 'No skin analysis found',
+      };
+    }
+
+    const recommendedCombos = await this.prisma.skincare_combos.findMany({
+      where: {
+        skin_type_id: skinAnalysis.skin_type_id,
+        is_active: true,
+      },
+      select: { id: true },
+      take: 4,
+    });
+
+    const metricsObject = skinAnalysis.metrics.reduce(
+      (acc, m) => {
+        acc[m.metric_type] = m.score ? Number(m.score) : null;
+        return acc;
+      },
+      {} as Record<string, number | null>,
+    );
+
+    return {
+      user_id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      skin_analysis: {
+        analysisId: skinAnalysis.id,
+        result: {
+          isValidImage: true,
+          imageUrl: skinAnalysis.face_image_url,
+          skinType: skinAnalysis.skin_type.code,
+          overallScore: skinAnalysis.overall_score
+            ? Number(skinAnalysis.overall_score)
+            : null,
+          overallComment: skinAnalysis.overall_comment,
+          metrics: metricsObject,
+          recommendedCombos: recommendedCombos.map((c) => c.id),
+        },
+        created_at: skinAnalysis.created_at.toISOString(),
+      },
+    };
   }
 }
 

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -39,6 +39,20 @@ export class SkinAnalysisController {
     return new SimpleResponse<{ analysisId: string | null; result: unknown }>(
       { analysisId, result },
       'Analysis completed successfully.',
+      200,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('result')
+  async getLatestSkinAnalysis(
+    @GetUser('id') userId: string,
+  ): Promise<SimpleResponse<any>> {
+    const data = await this.skinAnalysisService.getUserSkinAnalyses(userId);
+    return new SimpleResponse(
+      data,
+      'Get latest skin analysis successfully',
       200,
     );
   }

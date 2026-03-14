@@ -12,6 +12,7 @@ import { RoutinePackagesModule } from './modules/routine-packages/routine-packag
 import { CombosModule } from './modules/combos/combos.module';
 import { PaymentsModule } from './modules/payments/payment.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TrackingModule } from './modules/tracking/tracking.module';
     RoutinesModule,
     PaymentsModule,
     TrackingModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

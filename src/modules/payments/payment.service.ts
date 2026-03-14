@@ -117,27 +117,32 @@ export class PaymentsService {
     if (!pkg) throw new NotFoundException('Package not found');
 
     const startDate = new Date();
-
     const endDate = new Date();
     endDate.setDate(startDate.getDate() + pkg.duration_days);
 
-    await this.prisma.user_package_subscriptions.updateMany({
-      where: {
-        user_id: userId,
-        is_active: true,
-      },
-      data: { is_active: false },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const subscription = await tx.user_package_subscriptions.create({
+        data: {
+          user_id: userId,
+          routine_package_id: packageId,
+          selected_combo_id: comboId,
+          start_date: startDate,
+          end_date: endDate,
+          is_active: true,
+        },
+      });
 
-    return this.prisma.user_package_subscriptions.create({
-      data: {
-        user_id: userId,
-        routine_package_id: packageId,
-        selected_combo_id: comboId,
-        start_date: startDate,
-        end_date: endDate,
-        is_active: true,
-      },
+      await tx.payments.create({
+        data: {
+          user_id: userId,
+          subscription_id: subscription.id,
+          amount: 0,
+          vnp_OrderInfo: `Free Trial: ${pkg.package_name}`,
+          status: payment_status_enum.SUCCESS,
+        },
+      });
+
+      return subscription;
     });
   }
 
