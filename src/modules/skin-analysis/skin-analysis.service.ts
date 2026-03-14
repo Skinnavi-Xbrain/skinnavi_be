@@ -4,7 +4,6 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI, createUserContent } from '@google/genai';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, skin_metric_enum } from '@prisma/client';
@@ -19,10 +18,88 @@ export class SkinAnalysisService {
   private readonly logger = new Logger(SkinAnalysisService.name);
 
   constructor(
-    private configService: ConfigService,
     private prisma: PrismaService,
     private apiKeyManager: ApiKeyManagerService,
   ) {}
+
+  async checkAnalysisLimit(userId: string) {
+    const now = new Date();
+
+    const todayAnalysis = await this.prisma.skin_analyses.findFirst({
+      where: {
+        user_id: userId,
+        created_at: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+      },
+    });
+
+    if (todayAnalysis) {
+      throw new BadRequestException(
+        'You have already performed a skin analysis today. Please try again tomorrow.',
+      );
+    }
+
+    const activeSub = await this.prisma.user_package_subscriptions.findFirst({
+      where: {
+        user_id: userId,
+        is_active: true,
+        end_date: { gt: now },
+      },
+      include: { routine_package: true },
+    });
+
+    if (!activeSub) {
+      return;
+    }
+
+    const duration = activeSub.routine_package.duration_days;
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const totalAnalyses = await this.prisma.skin_analyses.count({
+      where: {
+        user_id: userId,
+        created_at: { gte: activeSub.start_date, lte: activeSub.end_date },
+      },
+    });
+
+    const weeklyAnalyses = await this.prisma.skin_analyses.count({
+      where: {
+        user_id: userId,
+        created_at: { gte: startOfWeek },
+      },
+    });
+
+    if (duration <= 7) {
+      if (totalAnalyses >= 1) {
+        throw new BadRequestException(
+          'The Free Trial allows only 1 skin analysis. Please upgrade to a paid package for more analyses.',
+        );
+      }
+    } else if (duration <= 30) {
+      if (weeklyAnalyses >= 3) {
+        throw new BadRequestException(
+          'The Essential Routine allows only 3 analyses per week. Please wait until next week or upgrade to the Advanced Routine for more frequent analyses.',
+        );
+      }
+    } else if (duration <= 90) {
+      if (weeklyAnalyses >= 5) {
+        throw new BadRequestException(
+          'The Advanced Routine allows only 5 analyses per week. Please wait until next week for more analyses.',
+        );
+      }
+    }
+
+    this.logger.debug({
+      startDate: activeSub.start_date,
+      endDate: activeSub.end_date,
+      totalAnalyses,
+      duration: activeSub.routine_package.duration_days,
+    });
+  }
 
   private async generateContentWithRetry(modelName: string, params: any) {
     let attempts = 0;
@@ -66,14 +143,14 @@ export class SkinAnalysisService {
 
   async analyzeImage(imageUrl: string, userId: string) {
     const imageBase64 = await this.fetchImageAsBase64(imageUrl);
-    const mimeType = inferMimeType(imageUrl);
+    const mimeType = this.inferMimeType(imageUrl);
 
     const imageHash = crypto
       .createHash('sha256')
       .update(imageBase64)
       .digest('hex');
 
-    const cached = await this.prisma.skin_analyses.findFirst({
+    const existingAnalysis = await this.prisma.skin_analyses.findFirst({
       where: { image_hash: imageHash },
       include: { metrics: true, skin_type: true },
     });
@@ -83,15 +160,51 @@ export class SkinAnalysisService {
       select: { id: true, combo_name: true, skin_type_id: true },
     });
 
-    if (cached) {
-      const response = this.mapAnalysisToResponse(cached);
+    if (existingAnalysis) {
+      if (existingAnalysis.user_id === userId) {
+        throw new BadRequestException(
+          'You have already uploaded this image. Please upload a new skin photo.',
+        );
+      }
 
-      const recommendedCombos = combos
-        .filter((c) => c.skin_type_id === cached.skin_type_id)
+      this.logger.log(
+        `Image hash match found from another user. Cloning results for user: ${userId}`,
+      );
+
+      const clonedAnalysis = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.skin_analyses.create({
+          data: {
+            user_id: userId,
+            skin_type_id: existingAnalysis.skin_type_id,
+            overall_score: existingAnalysis.overall_score,
+            overall_comment: existingAnalysis.overall_comment,
+            face_image_url: imageUrl,
+            image_hash: imageHash,
+          },
+        });
+
+        await tx.skin_analysis_metrics.createMany({
+          data: existingAnalysis.metrics.map((m) => ({
+            skin_analysis_id: created.id,
+            metric_type: m.metric_type,
+            score: m.score,
+          })),
+        });
+
+        return created;
+      });
+
+      const response = this.mapAnalysisToResponse({
+        ...clonedAnalysis,
+        metrics: existingAnalysis.metrics,
+        skin_type: existingAnalysis.skin_type,
+      });
+
+      response.result.recommendedCombos = combos
+        .filter((c) => c.skin_type_id === clonedAnalysis.skin_type_id)
         .slice(0, 4)
         .map((c) => c.id);
 
-      response.result.recommendedCombos = recommendedCombos;
       return response;
     }
 
@@ -106,7 +219,6 @@ export class SkinAnalysisService {
     });
 
     const previousAnalysisText = this.buildPreviousAnalysisText(last);
-
     const prompt = buildAnalysisPrompt(
       comboListText,
       imageUrl,
@@ -127,7 +239,6 @@ export class SkinAnalysisService {
     });
 
     const text = aiRes.text ?? aiRes.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!text) throw new BadRequestException('AI returned empty');
 
     const result = this.parseAIResponse(text);
@@ -180,6 +291,22 @@ export class SkinAnalysisService {
     };
   }
 
+  private inferMimeType(url: string): string {
+    const lower = url.toLowerCase();
+    if (lower.includes('png')) return 'image/png';
+    if (lower.includes('webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  private async fetchImageAsBase64(imageUrl: string) {
+    const res = await fetch(imageUrl);
+    if (!res.ok) {
+      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+    }
+    const buf = await res.arrayBuffer();
+    return Buffer.from(buf).toString('base64');
+  }
+
   private buildPreviousAnalysisText(last: any) {
     if (!last) return 'NO_PREVIOUS_ANALYSIS';
 
@@ -218,14 +345,14 @@ ${Object.entries(metrics)
     };
   }
 
-  private async fetchImageAsBase64(imageUrl: string) {
-    const res = await fetch(imageUrl);
-    if (!res.ok) {
-      throw new BadRequestException(`Cannot fetch image: ${res.status}`);
-    }
-    const buf = await res.arrayBuffer();
-    return Buffer.from(buf).toString('base64');
-  }
+  // private async fetchImageAsBase64(imageUrl: string) {
+  //   const res = await fetch(imageUrl);
+  //   if (!res.ok) {
+  //     throw new BadRequestException(`Cannot fetch image: ${res.status}`);
+  //   }
+  //   const buf = await res.arrayBuffer();
+  //   return Buffer.from(buf).toString('base64');
+  // }
 
   private parseAIResponse(text: string): AIAnalysisResult {
     const cleaned = text
@@ -432,11 +559,4 @@ STRICT RULES
 - NO null
 - NO extra text
 `;
-}
-
-function inferMimeType(url: string): string {
-  const lower = url.toLowerCase();
-  if (lower.includes('png')) return 'image/png';
-  if (lower.includes('webp')) return 'image/webp';
-  return 'image/jpeg';
 }

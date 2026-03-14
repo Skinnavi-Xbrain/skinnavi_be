@@ -14,10 +14,7 @@ export class RoutinesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('')
   @Post()
-  async create(
-    @GetUser('userId') userId: string,
-    @Body() dto: CreateRoutineDto,
-  ) {
+  async create(@GetUser('id') userId: string, @Body() dto: CreateRoutineDto) {
     const data = await this.routinesService.createRoutine({ ...dto, userId });
     return new SimpleResponse(data, 'Routine created successfully', 201);
   }
@@ -25,12 +22,11 @@ export class RoutinesController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('')
   @Get()
-  async getByUser(@GetUser('userId') userId: string) {
+  async getByUser(@GetUser('id') userId: string) {
     const data = await this.routinesService.getLatestRoutineByUser(userId);
     return new SimpleResponse(data, 'Get routine by user', 200);
   }
 
-  // return detailed information for a single step (product + sub steps)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('')
   @Get('steps/:id')

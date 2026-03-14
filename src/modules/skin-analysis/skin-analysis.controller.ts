@@ -29,6 +29,8 @@ export class SkinAnalysisController {
     @Body() dto: AnalyzeSkinDto,
     @GetUser('id') userId: string,
   ): Promise<SimpleResponse<{ analysisId: string | null; result: unknown }>> {
+    await this.skinAnalysisService.checkAnalysisLimit(userId);
+
     const { analysisId, result } = await this.skinAnalysisService.analyzeImage(
       dto.imageUrl,
       userId,
