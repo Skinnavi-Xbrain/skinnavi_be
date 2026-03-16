@@ -28,6 +28,7 @@ export class RoutinesService {
     contentParams: any,
   ) {
     let attempts = 0;
+
     while (attempts < this.apiKeyManager.totalKeys) {
       const apiKey = this.apiKeyManager.getCurrentKey();
 
@@ -41,19 +42,36 @@ export class RoutinesService {
           contents: contentParams,
         });
       } catch (error: any) {
+        const status = error?.status;
+        const message = error?.message?.toLowerCase() || '';
+
         if (
-          error?.status === 429 ||
-          error?.message?.includes('429') ||
-          error?.message?.toLowerCase().includes('quota')
+          status === 429 ||
+          message.includes('429') ||
+          message.includes('quota')
         ) {
+          this.logger.warn(`API key quota exceeded. Switching key...`);
           this.apiKeyManager.getNextKey();
           attempts++;
-        } else {
-          throw error;
+          continue;
         }
+
+        if (status === 503 || message.includes('high demand')) {
+          const delay = (attempts + 1) * 2000;
+          this.logger.warn(`Model overloaded. Retrying in ${delay}ms`);
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          attempts++;
+          continue;
+        }
+
+        throw error;
       }
     }
-    throw new BadRequestException('All API keys exhausted');
+
+    throw new BadRequestException(
+      'All API keys exhausted or service unavailable',
+    );
   }
 
   async createRoutine(params: {
@@ -104,15 +122,27 @@ export class RoutinesService {
       );
     }
 
-    const existingRoutine = await this.prisma.user_routines.findFirst({
+    const totalAnalysesInSub = await this.prisma.skin_analyses.count({
+      where: {
+        user_id: userId,
+        created_at: {
+          gte: subscription.start_date,
+          lte: subscription.end_date,
+        },
+      },
+    });
+
+    const existingRoutinesCount = await this.prisma.user_routines.count({
       where: {
         user_package_subscription_id: subscription.id,
       },
     });
 
-    if (existingRoutine && !subscription.routine_package.allow_tracking) {
+    const createdRoutinePairs = existingRoutinesCount / 2;
+
+    if (createdRoutinePairs >= totalAnalysesInSub) {
       throw new BadRequestException(
-        'Your package allows routine creation only once. Please upgrade to track progress.',
+        `You have created enough routines (${totalAnalysesInSub}) corresponding to the number of skin analyses available. Please perform a new skin analysis to update your routine.`,
       );
     }
 

@@ -53,57 +53,34 @@ export class SkinAnalysisService {
       return;
     }
 
-    const duration = activeSub.routine_package.duration_days;
-
-    const startOfWeek = new Date();
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const totalAnalyses = await this.prisma.skin_analyses.count({
+    const totalAnalysesInCurrentSub = await this.prisma.skin_analyses.count({
       where: {
         user_id: userId,
-        created_at: { gte: activeSub.start_date, lte: activeSub.end_date },
+        created_at: {
+          gte: activeSub.start_date,
+          lte: activeSub.end_date,
+        },
       },
     });
 
-    const weeklyAnalyses = await this.prisma.skin_analyses.count({
-      where: {
-        user_id: userId,
-        created_at: { gte: startOfWeek },
-      },
-    });
+    const limit = activeSub.routine_package.total_scan_limit;
 
-    if (duration <= 7) {
-      if (totalAnalyses >= 1) {
-        throw new BadRequestException(
-          'The Free Trial allows only 1 skin analysis. Please upgrade to a paid package for more analyses.',
-        );
-      }
-    } else if (duration <= 30) {
-      if (weeklyAnalyses >= 3) {
-        throw new BadRequestException(
-          'The Essential Routine allows only 3 analyses per week. Please wait until next week or upgrade to the Advanced Routine for more frequent analyses.',
-        );
-      }
-    } else if (duration <= 90) {
-      if (weeklyAnalyses >= 5) {
-        throw new BadRequestException(
-          'The Advanced Routine allows only 5 analyses per week. Please wait until next week for more analyses.',
-        );
-      }
+    if (totalAnalysesInCurrentSub >= limit) {
+      throw new BadRequestException(
+        `Your current package (${activeSub.routine_package.package_name}) allows only ${limit} skin analyses in total. Please upgrade or renew your package.`,
+      );
     }
 
     this.logger.debug({
-      startDate: activeSub.start_date,
-      endDate: activeSub.end_date,
-      totalAnalyses,
-      duration: activeSub.routine_package.duration_days,
+      packageName: activeSub.routine_package.package_name,
+      used: totalAnalysesInCurrentSub,
+      limit: limit,
     });
   }
 
   private async generateContentWithRetry(modelName: string, params: any) {
     let attempts = 0;
-    const maxAttempts = this.apiKeyManager.totalKeys;
+    const maxAttempts = this.apiKeyManager.totalKeys * 2;
 
     while (attempts < maxAttempts) {
       const apiKey = this.apiKeyManager.getCurrentKey();
@@ -118,26 +95,40 @@ export class SkinAnalysisService {
           ...params,
         });
       } catch (error: any) {
+        const status = error?.status;
+        const message = error?.message?.toLowerCase() || '';
+
         if (
-          error?.status === 429 ||
-          error?.message?.includes('429') ||
-          error?.message?.toLowerCase().includes('quota')
+          status === 429 ||
+          message.includes('429') ||
+          message.includes('quota')
         ) {
-          this.logger.warn(
-            `API Key index ${attempts} exhausted. Switching to next key...`,
-          );
+          this.logger.warn(`API key quota exceeded. Switching to next key...`);
 
           this.apiKeyManager.getNextKey();
           attempts++;
-        } else {
-          this.logger.error(`AI Generation error: ${error.message}`);
-          throw error;
+          continue;
         }
+
+        if (status === 503 || message.includes('high demand')) {
+          const delay = Math.min((attempts + 1) * 2000, 10000);
+
+          this.logger.warn(
+            `Gemini model overloaded. Retrying in ${delay}ms...`,
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          attempts++;
+          continue;
+        }
+
+        this.logger.error(`AI Generation error: ${error.message}`);
+        throw error;
       }
     }
 
     throw new BadRequestException(
-      'All GEMINI API keys have exceeded their quota for today.',
+      'Gemini AI service unavailable or all API keys exhausted.',
     );
   }
 
@@ -369,7 +360,7 @@ ${Object.entries(metrics)
     return parsed.data;
   }
 
-  async getUserSkinAnalyses(userId: string) {
+  async getLatestSkinAnalysis(userId: string) {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
     });
@@ -392,14 +383,7 @@ ${Object.entries(metrics)
     });
 
     if (!skinAnalysis) {
-      return {
-        user_id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        avatar_url: user.avatar_url,
-        skin_analysis: null,
-        message: 'No skin analysis found',
-      };
+      return null;
     }
 
     const recommendedCombos = await this.prisma.skincare_combos.findMany({
@@ -420,24 +404,17 @@ ${Object.entries(metrics)
     );
 
     return {
-      user_id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-      skin_analysis: {
-        analysisId: skinAnalysis.id,
-        result: {
-          isValidImage: true,
-          imageUrl: skinAnalysis.face_image_url,
-          skinType: skinAnalysis.skin_type.code,
-          overallScore: skinAnalysis.overall_score
-            ? Number(skinAnalysis.overall_score)
-            : null,
-          overallComment: skinAnalysis.overall_comment,
-          metrics: metricsObject,
-          recommendedCombos: recommendedCombos.map((c) => c.id),
-        },
-        created_at: skinAnalysis.created_at.toISOString(),
+      analysisId: skinAnalysis.id,
+      result: {
+        isValidImage: true,
+        imageUrl: skinAnalysis.face_image_url,
+        skinType: skinAnalysis.skin_type.code,
+        overallScore: skinAnalysis.overall_score
+          ? Number(skinAnalysis.overall_score)
+          : null,
+        metrics: metricsObject,
+        overallComment: skinAnalysis.overall_comment,
+        recommendedCombos: recommendedCombos.map((c) => c.id),
       },
     };
   }

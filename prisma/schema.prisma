@@ -121,7 +121,7 @@ model routine_packages {
   highlights         Json
   duration_days      Int
   price              Decimal                    @db.Decimal(10,2)
-  weekly_scan_limit  Int
+  total_scan_limit   Int                        @default(1)
   allow_tracking     Boolean
 
   allowed_combos     package_allowed_combos[]

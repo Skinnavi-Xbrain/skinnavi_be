@@ -29,14 +29,6 @@ export class PaymentsService {
       throw new NotFoundException('Package not found');
     }
 
-    const hasEverHadActiveSubscription =
-      await this.prisma.user_package_subscriptions.findFirst({
-        where: {
-          user_id: userId,
-          is_active: true,
-        },
-      });
-
     const currentActiveSub =
       await this.prisma.user_package_subscriptions.findFirst({
         where: {
@@ -47,6 +39,32 @@ export class PaymentsService {
         include: {
           routine_package: true,
         },
+      });
+
+    if (currentActiveSub && currentActiveSub.routine_package_id === packageId) {
+      const existingRoutinesCount = await this.prisma.user_routines.count({
+        where: { user_package_subscription_id: currentActiveSub.id },
+      });
+      const createdRoutinePairs = existingRoutinesCount / 2;
+
+      if (
+        createdRoutinePairs < currentActiveSub.routine_package.total_scan_limit
+      ) {
+        return {
+          requiresPayment: false,
+          isFreeTrial: false,
+          hasActivePackage: true,
+          currentPackage: {
+            name: currentActiveSub.routine_package.package_name,
+            endDate: currentActiveSub.end_date,
+          },
+        };
+      }
+    }
+
+    const hasEverHadActiveSubscription =
+      await this.prisma.user_package_subscriptions.findFirst({
+        where: { user_id: userId, is_active: true },
       });
 
     const isEligibleForFreeTrial =

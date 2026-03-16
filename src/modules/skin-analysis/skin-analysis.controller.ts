@@ -49,7 +49,12 @@ export class SkinAnalysisController {
   async getLatestSkinAnalysis(
     @GetUser('id') userId: string,
   ): Promise<SimpleResponse<any>> {
-    const data = await this.skinAnalysisService.getUserSkinAnalyses(userId);
+    const data = await this.skinAnalysisService.getLatestSkinAnalysis(userId);
+
+    if (!data) {
+      return new SimpleResponse(null, 'No skin analysis found', 200);
+    }
+
     return new SimpleResponse(
       data,
       'Get latest skin analysis successfully',
