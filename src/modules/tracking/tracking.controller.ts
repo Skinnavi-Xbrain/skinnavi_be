@@ -23,13 +23,19 @@ export class TrackingController {
   constructor(private readonly trackingService: TrackingService) {}
 
   @Post('daily-logs')
-  async createDailyLogs(): Promise<SimpleResponse<any>> {
+  async createDailyLogs(
+    @GetUser('id') userId: string,
+  ): Promise<SimpleResponse<any>> {
+    await this.trackingService.validateTrackingAccess(userId);
     const data = await this.trackingService.createDailyLogs();
     return new SimpleResponse(data, 'Daily logs created successfully', 201);
   }
 
   @Post('daily-logs/check-all')
-  async createAndCheckDailyLogs(): Promise<SimpleResponse<any>> {
+  async createAndCheckDailyLogs(
+    @GetUser('id') userId: string,
+  ): Promise<SimpleResponse<any>> {
+    await this.trackingService.validateTrackingAccess(userId);
     const data = await this.trackingService.createAndCheckDailyLogs();
     return new SimpleResponse(
       data,
@@ -77,7 +83,6 @@ export class TrackingController {
     @GetUser('id') userId: string,
     @Query() query: TrackingQueryDto,
   ): Promise<SimpleResponse<any>> {
-    await this.trackingService.validateTrackingAccess(userId);
     const data = await this.trackingService.getDailyLogs(
       userId,
       query.startDate,
@@ -94,6 +99,7 @@ export class TrackingController {
     @Query() query: TrackingQueryDto,
   ): Promise<SimpleResponse<any>> {
     const days = query.days ?? 7;
+    await this.trackingService.validateTrackingAccess(userId);
     const data = await this.trackingService.getUserSkinAnalyses(userId, days);
     return new SimpleResponse(data, 'Get user skin analyses', 200);
   }

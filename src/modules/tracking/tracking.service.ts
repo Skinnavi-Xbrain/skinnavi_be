@@ -50,16 +50,22 @@ export class TrackingService implements OnModuleInit {
     }
   }
 
+  private toDateOnly(date: Date) {
+    return new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+    );
+  }
+
   async createAndCheckDailyLogs(): Promise<{
     created: number;
     checked: number;
     logs: any[];
   }> {
     const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = this.toDateOnly(now);
+
+    const todayEnd = new Date(today);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     const activeRoutines = await this.prisma.user_routines.findMany({
       where: {
@@ -79,28 +85,34 @@ export class TrackingService implements OnModuleInit {
 
     for (const routine of activeRoutines) {
       try {
-        const routineStartDate = new Date(routine.created_at);
-        routineStartDate.setHours(0, 0, 0, 0);
+        const routineStartDate = this.toDateOnly(new Date(routine.created_at));
 
-        const subscriptionEndDate = new Date(routine.subscription.end_date);
-        subscriptionEndDate.setHours(23, 59, 59, 999);
+        const subscriptionEndDate = new Date(
+          this.toDateOnly(new Date(routine.subscription.end_date)),
+        );
+        subscriptionEndDate.setUTCHours(23, 59, 59, 999);
+
+        const subStart = this.toDateOnly(
+          new Date(routine.subscription.start_date),
+        );
 
         const startDate =
-          routineStartDate > new Date(routine.subscription.start_date)
-            ? routineStartDate
-            : new Date(routine.subscription.start_date);
+          routineStartDate > subStart ? routineStartDate : subStart;
 
         const endDate =
           today < subscriptionEndDate ? today : subscriptionEndDate;
 
         const currentDate = new Date(startDate);
+
         while (currentDate <= endDate) {
-          const logDate = new Date(currentDate);
+          const logDate = this.toDateOnly(currentDate);
 
           const existingLog = await this.prisma.routine_daily_logs.findFirst({
             where: {
               user_routine_id: routine.id,
-              log_date: logDate,
+              log_date: {
+                equals: logDate,
+              },
             },
           });
 
@@ -131,6 +143,7 @@ export class TrackingService implements OnModuleInit {
     this.logger.log(
       `Checked ${totalChecked} logs, created ${totalCreated} new logs`,
     );
+
     return { created: totalCreated, checked: totalChecked, logs: allLogs };
   }
 
@@ -187,10 +200,10 @@ export class TrackingService implements OnModuleInit {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async createDailyLogs() {
     const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = this.toDateOnly(now);
+
+    const todayEnd = new Date(today);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     const activeRoutines = await this.prisma.user_routines.findMany({
       where: {
@@ -205,30 +218,37 @@ export class TrackingService implements OnModuleInit {
     });
 
     const results: any[] = [];
+
     for (const routine of activeRoutines) {
       try {
-        const routineStartDate = new Date(routine.created_at);
-        routineStartDate.setHours(0, 0, 0, 0);
+        const routineStartDate = this.toDateOnly(new Date(routine.created_at));
 
-        const subscriptionEndDate = new Date(routine.subscription.end_date);
-        subscriptionEndDate.setHours(23, 59, 59, 999);
+        const subscriptionEndDate = new Date(
+          this.toDateOnly(new Date(routine.subscription.end_date)),
+        );
+        subscriptionEndDate.setUTCHours(23, 59, 59, 999);
+
+        const subStart = this.toDateOnly(
+          new Date(routine.subscription.start_date),
+        );
 
         const startDate =
-          routineStartDate > new Date(routine.subscription.start_date)
-            ? routineStartDate
-            : new Date(routine.subscription.start_date);
+          routineStartDate > subStart ? routineStartDate : subStart;
 
         const endDate =
           today < subscriptionEndDate ? today : subscriptionEndDate;
 
         const currentDate = new Date(startDate);
+
         while (currentDate <= endDate) {
-          const logDate = new Date(currentDate);
+          const logDate = this.toDateOnly(currentDate);
 
           const existingLog = await this.prisma.routine_daily_logs.findFirst({
             where: {
               user_routine_id: routine.id,
-              log_date: logDate,
+              log_date: {
+                equals: logDate,
+              },
             },
           });
 
