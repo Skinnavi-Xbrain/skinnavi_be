@@ -250,8 +250,86 @@ export class AdminUsersService {
       throw new NotFoundException('User not found');
     }
 
-    await this.prisma.users.delete({
-      where: { id: userId },
+    await this.prisma.$transaction(async (tx) => {
+      const analyses = await tx.skin_analyses.findMany({
+        where: { user_id: userId },
+        select: { id: true },
+      });
+
+      const analysisIds = analyses.map((a) => a.id);
+
+      if (analysisIds.length > 0) {
+        await tx.skin_analysis_metrics.deleteMany({
+          where: { skin_analysis_id: { in: analysisIds } },
+        });
+
+        await tx.skin_analyses.deleteMany({
+          where: { id: { in: analysisIds } },
+        });
+      }
+
+      const subs = await tx.user_package_subscriptions.findMany({
+        where: { user_id: userId },
+        select: { id: true },
+      });
+
+      const subIds = subs.map((s) => s.id);
+
+      if (subIds.length > 0) {
+        const routines = await tx.user_routines.findMany({
+          where: { user_package_subscription_id: { in: subIds } },
+          select: { id: true },
+        });
+
+        const routineIds = routines.map((r) => r.id);
+
+        if (routineIds.length > 0) {
+          await tx.routine_daily_logs.deleteMany({
+            where: { user_routine_id: { in: routineIds } },
+          });
+
+          const steps = await tx.user_routine_steps.findMany({
+            where: { user_routine_id: { in: routineIds } },
+            select: { id: true },
+          });
+
+          const stepIds = steps.map((s) => s.id);
+
+          if (stepIds.length > 0) {
+            await tx.user_routine_sub_steps.deleteMany({
+              where: { user_routine_step_id: { in: stepIds } },
+            });
+
+            await tx.user_routine_steps.deleteMany({
+              where: { id: { in: stepIds } },
+            });
+          }
+
+          await tx.user_routines.deleteMany({
+            where: { id: { in: routineIds } },
+          });
+        }
+
+        await tx.payments.deleteMany({
+          where: { subscription_id: { in: subIds } },
+        });
+
+        await tx.user_package_subscriptions.deleteMany({
+          where: { id: { in: subIds } },
+        });
+      }
+
+      await tx.affiliate_click_logs.deleteMany({
+        where: { user_id: userId },
+      });
+
+      await tx.payments.deleteMany({
+        where: { user_id: userId },
+      });
+
+      await tx.users.delete({
+        where: { id: userId },
+      });
     });
 
     return {
