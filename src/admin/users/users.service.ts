@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import bcrypt from 'bcrypt';
 
 type GetUserStatsArgs = {
   activeDays: number;
@@ -50,6 +55,7 @@ export class AdminUsersService {
         'Active = users with a skin analysis within activeDays OR (optionally) an active subscription today.',
     };
   }
+
   async getUserGrowth() {
     const rows = await this.prisma.$queryRaw<
       Array<{ month: Date; new_users: bigint }>
@@ -67,6 +73,7 @@ export class AdminUsersService {
       newUsers: Number(row.new_users),
     }));
   }
+
   async getUsers(page: number, limit: number) {
     const skip = (page - 1) * limit;
 
@@ -209,14 +216,28 @@ export class AdminUsersService {
 
   async createUser(data: {
     email: string;
-    passwordHash: string;
+    password: string;
     fullName?: string;
     role?: 'USER' | 'ADMIN';
   }) {
+    const existingUser = await this.prisma.users.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('Email already exists');
+    }
+
+    if (data.password.length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters');
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
     return this.prisma.users.create({
       data: {
-        email: data.email,
-        password_hash: data.passwordHash,
+        email: data.email.toLowerCase().trim(),
+        password_hash: hashedPassword,
         full_name: data.fullName,
         role: data.role ?? 'USER',
       },
