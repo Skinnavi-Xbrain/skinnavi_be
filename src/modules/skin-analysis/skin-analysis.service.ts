@@ -43,7 +43,7 @@ export class SkinAnalysisService {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        is_active: true,
+        status: 'ACTIVE',
         end_date: { gt: now },
       },
       include: { routine_package: true },

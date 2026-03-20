@@ -33,7 +33,7 @@ export class PaymentsService {
       await this.prisma.user_package_subscriptions.findFirst({
         where: {
           user_id: userId,
-          is_active: true,
+          status: 'ACTIVE',
           end_date: { gt: now },
         },
         include: {
@@ -64,7 +64,7 @@ export class PaymentsService {
 
     const hasEverHadActiveSubscription =
       await this.prisma.user_package_subscriptions.findFirst({
-        where: { user_id: userId, is_active: true },
+        where: { user_id: userId, status: 'ACTIVE' },
       });
 
     const isEligibleForFreeTrial =
@@ -111,7 +111,7 @@ export class PaymentsService {
         selected_combo_id: comboId,
         start_date: new Date(),
         end_date: new Date(),
-        is_active: false,
+        status: 'CANCELED',
       },
     });
 
@@ -146,7 +146,7 @@ export class PaymentsService {
           selected_combo_id: comboId,
           start_date: startDate,
           end_date: endDate,
-          is_active: true,
+          status: 'ACTIVE',
         },
       });
 
@@ -219,10 +219,10 @@ export class PaymentsService {
         await tx.user_package_subscriptions.updateMany({
           where: {
             user_id: payment.user_id,
-            is_active: true,
+            status: 'ACTIVE',
           },
           data: {
-            is_active: false,
+            status: 'CANCELED',
           },
         });
 
@@ -231,7 +231,7 @@ export class PaymentsService {
           data: {
             start_date: startDate,
             end_date: endDate,
-            is_active: true,
+            status: 'ACTIVE',
           },
         });
       });

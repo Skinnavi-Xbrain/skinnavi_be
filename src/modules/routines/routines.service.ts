@@ -106,7 +106,7 @@ export class RoutinesService {
           user_id: userId,
           routine_package_id: routinePackageId,
           selected_combo_id: comboId,
-          is_active: true,
+          status: 'ACTIVE',
           end_date: { gt: new Date() },
         },
         include: {

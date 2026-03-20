@@ -145,7 +145,7 @@ model user_package_subscriptions {
   selected_combo_id  String             @db.Uuid
   start_date         DateTime           @db.Date
   end_date           DateTime           @db.Date
-  is_active          Boolean            @default(true)
+  status subscription_status_enum @default(ACTIVE)
   created_at         DateTime           @default(now())
 
   user               users              @relation(fields: [user_id], references: [id])
@@ -252,4 +252,10 @@ enum payment_status_enum {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum subscription_status_enum {
+  ACTIVE
+  EXPIRED
+  CANCELED
 }

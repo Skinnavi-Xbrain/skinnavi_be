@@ -29,6 +29,19 @@ export class AdminSubscriptionsController {
   async getPackages() {
     return this.subscriptionsService.getPackages();
   }
+  @Get('stats/conversion-rate')
+  async getFreeToPaidConversion() {
+    return this.subscriptionsService.getFreeToPaidConversion();
+  }
+
+  @Get('stats/conversion-rate/monthly')
+  async getMonthlyConversionRate() {
+    return this.subscriptionsService.getMonthlyConversionRate();
+  }
+  @Get('stats/status')
+  async getSubscriptionStatsByStatus() {
+    return this.subscriptionsService.getSubscriptionStatsByStatus();
+  }
 
   @Get(':id')
   async getPackageDetail(@Param('id') id: string) {
