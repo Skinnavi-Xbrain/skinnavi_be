@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { subscription_status_enum } from '@prisma/client';
+import { Order } from '@Constant/index';
 
 @Injectable()
 export class AdminSubscriptionsService {
@@ -14,7 +16,7 @@ export class AdminSubscriptionsService {
 
     const activeCount = await this.prisma.user_package_subscriptions.count({
       where: {
-        status: 'ACTIVE',
+        status: subscription_status_enum.ACTIVE,
         start_date: { lte: now },
         end_date: { gte: now },
       },
@@ -23,7 +25,7 @@ export class AdminSubscriptionsService {
     const byPackage = await this.prisma.user_package_subscriptions.groupBy({
       by: ['routine_package_id'],
       where: {
-        status: 'ACTIVE',
+        status: subscription_status_enum.ACTIVE,
         start_date: { lte: now },
         end_date: { gte: now },
       },
@@ -51,7 +53,7 @@ export class AdminSubscriptionsService {
         },
       },
       orderBy: {
-        price: 'asc',
+        price: Order.ASC,
       },
     });
 
@@ -179,14 +181,17 @@ export class AdminSubscriptionsService {
     const subs = await this.prisma.user_package_subscriptions.findMany({
       where: {
         status: {
-          in: ['ACTIVE', 'EXPIRED'], // ❗ bỏ canceled
+          in: [
+            subscription_status_enum.ACTIVE,
+            subscription_status_enum.EXPIRED,
+          ],
         },
       },
       include: {
         routine_package: true,
       },
       orderBy: {
-        created_at: 'asc',
+        created_at: Order.ASC,
       },
     });
 
@@ -240,7 +245,10 @@ export class AdminSubscriptionsService {
     const subs = await this.prisma.user_package_subscriptions.findMany({
       where: {
         status: {
-          in: ['ACTIVE', 'EXPIRED'],
+          in: [
+            subscription_status_enum.ACTIVE,
+            subscription_status_enum.EXPIRED,
+          ],
         },
       },
       include: {
@@ -249,7 +257,7 @@ export class AdminSubscriptionsService {
         },
       },
       orderBy: {
-        start_date: 'asc',
+        start_date: Order.ASC,
       },
     });
 

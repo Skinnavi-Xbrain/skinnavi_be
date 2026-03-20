@@ -5,7 +5,7 @@
 
 */
 -- CreateEnum
-CREATE TYPE "subscription_status_enum" AS ENUM ('ACTIVE', 'EXPIRED', 'CANCELED');
+CREATE TYPE "subscription_status_enum" AS ENUM ('PENDING','ACTIVE', 'EXPIRED', 'FAILED', 'CANCELED');
 
 -- AlterTable
 ALTER TABLE "user_package_subscriptions" DROP COLUMN "is_active",

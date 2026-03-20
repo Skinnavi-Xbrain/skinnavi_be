@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { GoogleGenAI } from '@google/genai';
 import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
+import { subscription_status_enum } from '@prisma/client';
+import { Order } from '@Constant/index';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -105,44 +107,19 @@ export class RoutinesService {
         where: {
           user_id: userId,
           routine_package_id: routinePackageId,
-          selected_combo_id: comboId,
-          status: 'ACTIVE',
+          status: subscription_status_enum.ACTIVE,
           end_date: { gt: new Date() },
         },
         include: {
           routine_package: true,
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: Order.DESC },
       },
     );
 
     if (!subscription) {
       throw new BadRequestException(
         'No active subscription found. Please subscribe to the package first.',
-      );
-    }
-
-    const totalAnalysesInSub = await this.prisma.skin_analyses.count({
-      where: {
-        user_id: userId,
-        created_at: {
-          gte: subscription.start_date,
-          lte: subscription.end_date,
-        },
-      },
-    });
-
-    const existingRoutinesCount = await this.prisma.user_routines.count({
-      where: {
-        user_package_subscription_id: subscription.id,
-      },
-    });
-
-    const createdRoutinePairs = existingRoutinesCount / 2;
-
-    if (createdRoutinePairs >= totalAnalysesInSub) {
-      throw new BadRequestException(
-        `You have created enough routines (${totalAnalysesInSub}) corresponding to the number of skin analyses available. Please perform a new skin analysis to update your routine.`,
       );
     }
 
@@ -194,16 +171,13 @@ export class RoutinesService {
 
     const raw =
       (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!raw) throw new BadRequestException('AI did not return JSON');
 
     const cleaned = raw
       .replace(/^```json\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-
     let parsed: any;
-
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -217,13 +191,12 @@ export class RoutinesService {
         data: {
           user_package_subscription_id: subscription.id,
           routine_time: time,
+          skin_analysis_id: skinAnalysisId,
         },
       });
 
       for (const step of steps) {
-        if (!validProductIds.includes(step.productId)) {
-          throw new BadRequestException(`Invalid productId: ${step.productId}`);
-        }
+        if (!validProductIds.includes(step.productId)) continue;
 
         const productInfo = combo.combo_products.find(
           (cp) => cp.product.id === step.productId,
@@ -242,9 +215,7 @@ export class RoutinesService {
           const template =
             await this.prisma.product_usage_instructions.findUnique({
               where: { usage_role: productInfo.usage_role },
-              include: {
-                sub_steps: { orderBy: { step_order: 'asc' } },
-              },
+              include: { sub_steps: { orderBy: { step_order: Order.ASC } } },
             });
 
           if (template?.sub_steps?.length) {
@@ -280,12 +251,12 @@ export class RoutinesService {
       include: {
         steps: {
           include: { product: true, sub_steps: true },
-          orderBy: { step_order: 'asc' },
+          orderBy: { step_order: Order.ASC },
         },
         subscription: true,
       },
       orderBy: {
-        created_at: 'desc',
+        created_at: Order.DESC,
       },
     });
   }
@@ -300,11 +271,11 @@ export class RoutinesService {
         include: {
           steps: {
             include: { product: true, sub_steps: true },
-            orderBy: { step_order: 'asc' },
+            orderBy: { step_order: Order.ASC },
           },
         },
         orderBy: {
-          created_at: 'desc',
+          created_at: Order.DESC,
         },
       }),
       this.prisma.user_routines.findFirst({
@@ -315,11 +286,11 @@ export class RoutinesService {
         include: {
           steps: {
             include: { product: true, sub_steps: true },
-            orderBy: { step_order: 'asc' },
+            orderBy: { step_order: Order.ASC },
           },
         },
         orderBy: {
-          created_at: 'desc',
+          created_at: Order.DESC,
         },
       }),
     ]);
@@ -366,7 +337,7 @@ export class RoutinesService {
         skin_type: true,
         metrics: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
     });
 
     if (skinAnalyses.length < 2) {

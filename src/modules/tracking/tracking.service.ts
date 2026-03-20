@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Order } from '@Constant/index';
 
 @Injectable()
 export class TrackingService implements OnModuleInit {
@@ -19,10 +20,13 @@ export class TrackingService implements OnModuleInit {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        status: 'ACTIVE',
-        end_date: { gt: new Date() },
       },
-      include: { routine_package: true },
+      orderBy: {
+        created_at: Order.DESC,
+      },
+      include: {
+        routine_package: true,
+      },
     });
 
     if (!activeSub) {
@@ -50,9 +54,17 @@ export class TrackingService implements OnModuleInit {
     }
   }
 
-  private toDateOnly(date: Date) {
+  private toDateOnly(date: Date): Date {
     return new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
     );
   }
 
@@ -130,7 +142,7 @@ export class TrackingService implements OnModuleInit {
             totalCreated++;
           }
 
-          currentDate.setDate(currentDate.getDate() + 1);
+          currentDate.setUTCDate(currentDate.getUTCDate() + 1);
         }
       } catch (error) {
         this.logger.error(
@@ -263,7 +275,7 @@ export class TrackingService implements OnModuleInit {
             results.push(newLog);
           }
 
-          currentDate.setDate(currentDate.getDate() + 1);
+          currentDate.setUTCDate(currentDate.getUTCDate() + 1);
         }
       } catch (error) {
         this.logger.error(
@@ -276,18 +288,72 @@ export class TrackingService implements OnModuleInit {
     return { created: results.length, logs: results };
   }
 
+  private getTimeRange(baseDate: Date, startHour: number, endHour: number) {
+    const start = new Date(baseDate);
+    start.setHours(startHour, 0, 0, 0);
+
+    const end = new Date(baseDate);
+    end.setHours(endHour, 0, 0, 0);
+
+    return { start, end };
+  }
+
+  private isInRange(now: Date, start: Date, end: Date) {
+    return now >= start && now < end;
+  }
+
   async updateDailyLog(logId: string, is_completed: boolean) {
     const log = await this.prisma.routine_daily_logs.findUnique({
       where: { id: logId },
+      include: {
+        user_routine: true,
+      },
     });
 
     if (!log) {
       throw new NotFoundException('Daily log not found');
     }
 
+    const now = new Date();
+
+    if (is_completed) {
+      const baseDate = new Date(log.log_date);
+      const routineTime = log.user_routine.routine_time;
+
+      const morningRange = this.getTimeRange(baseDate, 0, 12);
+
+      const eveningStart = new Date(baseDate);
+      eveningStart.setHours(12, 0, 0, 0);
+
+      const eveningEnd = new Date(baseDate);
+      eveningEnd.setDate(eveningEnd.getDate() + 1);
+      eveningEnd.setHours(0, 0, 0, 0);
+
+      if (
+        routineTime === 'MORNING' &&
+        !this.isInRange(now, morningRange.start, morningRange.end)
+      ) {
+        throw new BadRequestException(
+          'Morning routine must be checked between 12:00 AM and 12:00 PM',
+        );
+      }
+
+      if (
+        routineTime === 'EVENING' &&
+        !this.isInRange(now, eveningStart, eveningEnd)
+      ) {
+        throw new BadRequestException(
+          'Evening routine must be checked between 12:00 PM and 12:00 AM',
+        );
+      }
+    }
+
     return this.prisma.routine_daily_logs.update({
       where: { id: logId },
-      data: { is_completed },
+      data: {
+        is_completed,
+        completed_at: is_completed ? now : null,
+      },
     });
   }
 
@@ -304,7 +370,6 @@ export class TrackingService implements OnModuleInit {
       throw new NotFoundException('User not found');
     }
 
-    // Parse dates with fallback to full range if not provided
     let start: Date | null = null;
     let end: Date | null = null;
 
@@ -318,17 +383,15 @@ export class TrackingService implements OnModuleInit {
       end.setHours(23, 59, 59, 999);
     }
 
-    // Get all skin analyses with metrics (for trend analysis)
     const skinAnalyses = await this.prisma.skin_analyses.findMany({
       where: { user_id: userId },
       include: {
         skin_type: true,
         metrics: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
     });
 
-    // Build skin analyses with trend calculation
     const analyzesWithTrend: any[] = [];
     for (let i = 0; i < skinAnalyses.length; i++) {
       const current = skinAnalyses[i];
@@ -357,7 +420,6 @@ export class TrackingService implements OnModuleInit {
       });
     }
 
-    // Get all routines with daily logs (filter logs by date range)
     const subscriptions = await this.prisma.user_package_subscriptions.findMany(
       {
         where: { user_id: userId },
@@ -367,16 +429,15 @@ export class TrackingService implements OnModuleInit {
               daily_logs: {
                 where:
                   start && end ? { log_date: { gte: start, lte: end } } : {},
-                orderBy: { log_date: 'asc' },
+                orderBy: { log_date: Order.ASC },
               },
             },
-            orderBy: { routine_time: 'asc' },
+            orderBy: { routine_time: Order.ASC },
           },
         },
       },
     );
 
-    // Build routines array (separated from skin analyses)
     const routines: any[] = [];
 
     for (const subscription of subscriptions) {
@@ -449,10 +510,10 @@ export class TrackingService implements OnModuleInit {
               daily_logs: {
                 where:
                   start && end ? { log_date: { gte: start, lte: end } } : {},
-                orderBy: { log_date: 'asc' },
+                orderBy: { log_date: Order.ASC },
               },
             },
-            orderBy: { routine_time: 'asc' },
+            orderBy: { routine_time: Order.ASC },
           },
         },
       },
@@ -518,7 +579,7 @@ export class TrackingService implements OnModuleInit {
         skin_type: true,
         metrics: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
     });
 
     if (skinAnalyses.length < 2) {

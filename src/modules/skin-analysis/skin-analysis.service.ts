@@ -6,10 +6,15 @@ import {
 } from '@nestjs/common';
 import { GoogleGenAI, createUserContent } from '@google/genai';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma, skin_metric_enum } from '@prisma/client';
+import {
+  Prisma,
+  skin_metric_enum,
+  subscription_status_enum,
+} from '@prisma/client';
 import crypto from 'crypto';
 import { AIAnalysisResult, analysisResultSchema } from './skin-analysis.schema';
 import { ApiKeyManagerService } from '../../common/aipKeyManager/api-key-manager.service';
+import { Order } from '@Constant/index';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -43,7 +48,7 @@ export class SkinAnalysisService {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        status: 'ACTIVE',
+        status: subscription_status_enum.ACTIVE,
         end_date: { gt: now },
       },
       include: { routine_package: true },
@@ -67,7 +72,7 @@ export class SkinAnalysisService {
 
     if (totalAnalysesInCurrentSub >= limit) {
       throw new BadRequestException(
-        `Your current package (${activeSub.routine_package.package_name}) allows only ${limit} skin analyses in total. Please upgrade or renew your package.`,
+        `Your current package ${activeSub.routine_package.package_name} allows only ${limit} skin analyses in total. Please upgrade or renew your package.`,
       );
     }
 
@@ -205,7 +210,7 @@ export class SkinAnalysisService {
 
     const last = await this.prisma.skin_analyses.findFirst({
       where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
       include: { metrics: true, skin_type: true },
     });
 
@@ -378,7 +383,7 @@ ${Object.entries(metrics)
         metrics: true,
       },
       orderBy: {
-        created_at: 'desc',
+        created_at: Order.DESC,
       },
     });
 

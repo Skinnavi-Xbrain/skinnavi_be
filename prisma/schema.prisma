@@ -44,6 +44,7 @@ model skin_analyses {
   user            users         @relation(fields: [user_id], references: [id])
   skin_type       skin_types    @relation(fields: [skin_type_id], references: [id])
   metrics         skin_analysis_metrics[]
+  routines        user_routines[]
 }
 
 model skin_analysis_metrics {
@@ -139,18 +140,18 @@ model package_allowed_combos {
 }
 
 model user_package_subscriptions {
-  id                 String             @id @default(uuid()) @db.Uuid
-  user_id            String             @db.Uuid
-  routine_package_id String             @db.Uuid
-  selected_combo_id  String             @db.Uuid
-  start_date         DateTime           @db.Date
-  end_date           DateTime           @db.Date
-  status subscription_status_enum @default(ACTIVE)
-  created_at         DateTime           @default(now())
+  id                 String                        @id @default(uuid()) @db.Uuid
+  user_id            String                        @db.Uuid
+  routine_package_id String                        @db.Uuid
+  selected_combo_id  String                        @db.Uuid
+  start_date         DateTime                      @db.Date
+  end_date           DateTime                      @db.Date
+  status             subscription_status_enum      @default(ACTIVE)
+  created_at         DateTime                      @default(now())
 
-  user               users              @relation(fields: [user_id], references: [id])
-  routine_package    routine_packages   @relation(fields: [routine_package_id], references: [id])
-  selected_combo     skincare_combos    @relation(fields: [selected_combo_id], references: [id])
+  user               users                         @relation(fields: [user_id], references: [id])
+  routine_package    routine_packages              @relation(fields: [routine_package_id], references: [id])
+  selected_combo     skincare_combos               @relation(fields: [selected_combo_id], references: [id])
   routines           user_routines[]
   payments           payments[]
 }
@@ -160,7 +161,9 @@ model user_routines {
   user_package_subscription_id   String                   @db.Uuid
   routine_time                   routine_time_enum
   created_at                     DateTime                 @default(now())
+  skin_analysis_id               String? @db.Uuid
 
+  skin_analysis                  skin_analyses? @relation(fields: [skin_analysis_id], references: [id])
   subscription                   user_package_subscriptions @relation(fields: [user_package_subscription_id], references: [id])
   steps                          user_routine_steps[]
   daily_logs                     routine_daily_logs[]
@@ -194,6 +197,7 @@ model routine_daily_logs {
   user_routine_id String          @db.Uuid
   log_date        DateTime        @db.Date
   is_completed    Boolean         @default(false)
+  completed_at    DateTime?    
 
   user_routine    user_routines   @relation(fields: [user_routine_id], references: [id])
 }
@@ -240,7 +244,6 @@ enum skin_metric_enum {
   ACNE
   DARK_CIRCLES
   DARK_SPOTS
-  WRINKLES
 }
 
 enum routine_time_enum {
@@ -255,7 +258,9 @@ enum payment_status_enum {
 }
 
 enum subscription_status_enum {
+  PENDING
   ACTIVE
+  FAILED 
   EXPIRED
   CANCELED
 }

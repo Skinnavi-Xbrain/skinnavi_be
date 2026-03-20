@@ -22,8 +22,15 @@ export class PaymentsController {
   async checkEligibility(
     @GetUser('id') userId: string,
     @Query('packageId') packageId: string,
+    @Query('comboId') comboId: string,
+    @Query('skinAnalysisId') skinAnalysisId: string,
   ) {
-    return this.paymentsService.checkEligibility(userId, packageId);
+    return this.paymentsService.checkEligibility(
+      userId,
+      packageId,
+      comboId,
+      skinAnalysisId,
+    );
   }
 
   @Post('free-trial')
