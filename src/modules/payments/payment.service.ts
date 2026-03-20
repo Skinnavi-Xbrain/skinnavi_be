@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { format } from 'date-fns';
 import { payment_status_enum } from '@prisma/client';
 import { EligibilityResponse } from './dto/payment-response.dto';
+import { SubscriptionStatus } from '@Constant/index';
 
 @Injectable()
 export class PaymentsService {
@@ -33,7 +34,7 @@ export class PaymentsService {
       await this.prisma.user_package_subscriptions.findFirst({
         where: {
           user_id: userId,
-          status: 'ACTIVE',
+          status: SubscriptionStatus.ACTIVE,
           end_date: { gt: now },
         },
         include: {
@@ -64,7 +65,7 @@ export class PaymentsService {
 
     const hasEverHadActiveSubscription =
       await this.prisma.user_package_subscriptions.findFirst({
-        where: { user_id: userId, status: 'ACTIVE' },
+        where: { user_id: userId, status: SubscriptionStatus.ACTIVE },
       });
 
     const isEligibleForFreeTrial =
@@ -111,7 +112,7 @@ export class PaymentsService {
         selected_combo_id: comboId,
         start_date: new Date(),
         end_date: new Date(),
-        status: 'CANCELED',
+        status: SubscriptionStatus.CANCELED,
       },
     });
 
@@ -146,7 +147,7 @@ export class PaymentsService {
           selected_combo_id: comboId,
           start_date: startDate,
           end_date: endDate,
-          status: 'ACTIVE',
+          status: SubscriptionStatus.ACTIVE,
         },
       });
 
@@ -219,10 +220,10 @@ export class PaymentsService {
         await tx.user_package_subscriptions.updateMany({
           where: {
             user_id: payment.user_id,
-            status: 'ACTIVE',
+            status: SubscriptionStatus.ACTIVE,
           },
           data: {
-            status: 'CANCELED',
+            status: SubscriptionStatus.CANCELED,
           },
         });
 
@@ -231,7 +232,7 @@ export class PaymentsService {
           data: {
             start_date: startDate,
             end_date: endDate,
-            status: 'ACTIVE',
+            status: SubscriptionStatus.ACTIVE,
           },
         });
       });

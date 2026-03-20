@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SubscriptionStatus } from '@Constant/index';
 
 @Injectable()
 export class AdminSubscriptionsService {
@@ -14,7 +15,7 @@ export class AdminSubscriptionsService {
 
     const activeCount = await this.prisma.user_package_subscriptions.count({
       where: {
-        status: 'ACTIVE',
+        status: SubscriptionStatus.ACTIVE,
         start_date: { lte: now },
         end_date: { gte: now },
       },
@@ -23,7 +24,7 @@ export class AdminSubscriptionsService {
     const byPackage = await this.prisma.user_package_subscriptions.groupBy({
       by: ['routine_package_id'],
       where: {
-        status: 'ACTIVE',
+        status: SubscriptionStatus.ACTIVE,
         start_date: { lte: now },
         end_date: { gte: now },
       },
@@ -179,7 +180,7 @@ export class AdminSubscriptionsService {
     const subs = await this.prisma.user_package_subscriptions.findMany({
       where: {
         status: {
-          in: ['ACTIVE', 'EXPIRED'], // ❗ bỏ canceled
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.EXPIRED],
         },
       },
       include: {
@@ -240,7 +241,7 @@ export class AdminSubscriptionsService {
     const subs = await this.prisma.user_package_subscriptions.findMany({
       where: {
         status: {
-          in: ['ACTIVE', 'EXPIRED'],
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.EXPIRED],
         },
       },
       include: {

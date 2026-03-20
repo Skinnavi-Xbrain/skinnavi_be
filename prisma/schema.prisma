@@ -139,18 +139,18 @@ model package_allowed_combos {
 }
 
 model user_package_subscriptions {
-  id                 String             @id @default(uuid()) @db.Uuid
-  user_id            String             @db.Uuid
-  routine_package_id String             @db.Uuid
-  selected_combo_id  String             @db.Uuid
-  start_date         DateTime           @db.Date
-  end_date           DateTime           @db.Date
-  status subscription_status_enum @default(ACTIVE)
-  created_at         DateTime           @default(now())
+  id                 String                        @id @default(uuid()) @db.Uuid
+  user_id            String                        @db.Uuid
+  routine_package_id String                        @db.Uuid
+  selected_combo_id  String                        @db.Uuid
+  start_date         DateTime                      @db.Date
+  end_date           DateTime                      @db.Date
+  status             subscription_status_enum      @default(ACTIVE)
+  created_at         DateTime                      @default(now())
 
-  user               users              @relation(fields: [user_id], references: [id])
-  routine_package    routine_packages   @relation(fields: [routine_package_id], references: [id])
-  selected_combo     skincare_combos    @relation(fields: [selected_combo_id], references: [id])
+  user               users                         @relation(fields: [user_id], references: [id])
+  routine_package    routine_packages              @relation(fields: [routine_package_id], references: [id])
+  selected_combo     skincare_combos               @relation(fields: [selected_combo_id], references: [id])
   routines           user_routines[]
   payments           payments[]
 }
@@ -194,6 +194,7 @@ model routine_daily_logs {
   user_routine_id String          @db.Uuid
   log_date        DateTime        @db.Date
   is_completed    Boolean         @default(false)
+  completed_at    DateTime?    
 
   user_routine    user_routines   @relation(fields: [user_routine_id], references: [id])
 }
