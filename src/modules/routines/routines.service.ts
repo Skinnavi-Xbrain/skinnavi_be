@@ -318,20 +318,22 @@ export class RoutinesService {
       where: { id: userId },
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
     const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    end.setUTCHours(23, 59, 59, 999);
+
     const start = new Date(end);
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
 
     const skinAnalyses = await this.prisma.skin_analyses.findMany({
       where: {
         user_id: userId,
-        created_at: { gte: start },
+        created_at: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         skin_type: true,
@@ -340,35 +342,35 @@ export class RoutinesService {
       orderBy: { created_at: Order.DESC },
     });
 
+    const baseResponse = {
+      user_id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      start_date: start.toISOString().split('T')[0],
+      end_date: end.toISOString().split('T')[0],
+    };
+
     if (skinAnalyses.length < 2) {
       return {
-        user_id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        avatar_url: user.avatar_url,
+        ...baseResponse,
         skin_analyses: [],
-        start_date: start.toISOString().split('T')[0],
-        end_date: end.toISOString().split('T')[0],
-        message: `At least 2 analyses are required between ${
-          start.toISOString().split('T')[0]
-        } and ${end.toISOString().split('T')[0]}`,
+        message: `Need at least 2 analyses to show trends (Found: ${skinAnalyses.length})`,
       };
     }
 
-    const analyzesWithTrend: any[] = [];
-    for (let i = 0; i < skinAnalyses.length; i++) {
-      const current = skinAnalyses[i];
-      const previous = skinAnalyses[i + 1];
-
+    const analyzesWithTrend = skinAnalyses.map((current, index) => {
+      const previous = skinAnalyses[index + 1];
       let scoreTrend: number | null = null;
-      if (current.overall_score && previous?.overall_score) {
+
+      if (current.overall_score !== null && previous?.overall_score !== null) {
         scoreTrend =
           Number(current.overall_score) - Number(previous.overall_score);
       }
 
-      analyzesWithTrend.push({
+      return {
         id: current.id,
-        skin_type_code: current.skin_type.code,
+        skin_type_code: current.skin_type?.code || 'N/A',
         overall_score: current.overall_score
           ? Number(current.overall_score)
           : null,
@@ -380,16 +382,11 @@ export class RoutinesService {
           metric_type: m.metric_type,
           score: m.score ? Number(m.score) : null,
         })),
-      });
-    }
+      };
+    });
 
     return {
-      user_id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-      start_date: start.toISOString().split('T')[0],
-      end_date: end.toISOString().split('T')[0],
+      ...baseResponse,
       skin_analyses: analyzesWithTrend,
     };
   }
