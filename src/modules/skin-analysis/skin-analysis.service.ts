@@ -30,11 +30,14 @@ export class SkinAnalysisService {
   async checkAnalysisLimit(userId: string) {
     const now = new Date();
 
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     const todayAnalysis = await this.prisma.skin_analyses.findFirst({
       where: {
         user_id: userId,
         created_at: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          gte: startOfDay,
         },
       },
     });
@@ -48,10 +51,17 @@ export class SkinAnalysisService {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        status: subscription_status_enum.ACTIVE,
+        status: {
+          in: [
+            subscription_status_enum.ACTIVE,
+            subscription_status_enum.CANCELED,
+          ],
+        },
         end_date: { gt: now },
+        start_date: { lt: now },
       },
       include: { routine_package: true },
+      orderBy: { created_at: 'desc' },
     });
 
     if (!activeSub) {
@@ -72,11 +82,12 @@ export class SkinAnalysisService {
 
     if (totalAnalysesInCurrentSub >= limit) {
       throw new BadRequestException(
-        `Your current package ${activeSub.routine_package.package_name} allows only ${limit} skin analyses in total. Please upgrade or renew your package.`,
+        `Your current package "${activeSub.routine_package.package_name}" has reached its limit of ${limit} analyses. Please upgrade or renew.`,
       );
     }
 
     this.logger.debug({
+      message: 'Analysis limit check passed',
       packageName: activeSub.routine_package.package_name,
       used: totalAnalysesInCurrentSub,
       limit: limit,
