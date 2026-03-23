@@ -99,7 +99,7 @@ export class PackageSubscriptionsService {
     });
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async handleExpireSubscriptions() {
     const now = new Date();
 
