@@ -217,7 +217,7 @@ export class TrackingService implements OnModuleInit {
     return { created: result.count };
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async createDailyLogs() {
     const now = new Date();
     const today = this.toDateOnly(now);
@@ -573,8 +573,6 @@ export class TrackingService implements OnModuleInit {
         include: {
           routine_package: true,
           routines: {
-            // Thêm điều kiện lọc routine ở đây nếu cần,
-            // nhưng cách tốt nhất là xử lý logic ở tầng code để tìm nhóm routine mới nhất
             include: {
               daily_logs: {
                 where: {
@@ -584,7 +582,7 @@ export class TrackingService implements OnModuleInit {
                 },
               },
             },
-            orderBy: { created_at: Order.DESC }, // Sắp xếp routine mới nhất lên đầu
+            orderBy: { created_at: Order.DESC },
           },
         },
       });
@@ -606,17 +604,12 @@ export class TrackingService implements OnModuleInit {
       };
     }
 
-    // --- LOGIC FIX: Lọc để chỉ lấy nhóm Routine tạo gần đây nhất ---
-    // Lấy thời gian tạo của routine mới nhất trong danh sách
     const latestRoutineCreatedAt = latestSubscription.routines[0].created_at;
-
-    // Lọc ra những routine được tạo cùng thời điểm với routine mới nhất
-    // (Cho phép chênh lệch vài giây nếu tạo theo loop)
     const latestRoutines = latestSubscription.routines.filter((r) => {
       const diffInSeconds =
         Math.abs(r.created_at.getTime() - latestRoutineCreatedAt.getTime()) /
         1000;
-      return diffInSeconds < 5; // Các routine tạo cách nhau dưới 5s được coi là cùng 1 lần tạo
+      return diffInSeconds < 5;
     });
 
     const routinesResult: any[] = [];
@@ -710,6 +703,7 @@ export class TrackingService implements OnModuleInit {
       const current = skinAnalyses[i];
       const previous = skinAnalyses[i + 1];
       let scoreTrend: number | null = null;
+
       if (current.overall_score && previous?.overall_score) {
         scoreTrend =
           Number(current.overall_score) - Number(previous.overall_score);
@@ -717,7 +711,6 @@ export class TrackingService implements OnModuleInit {
 
       analyzesWithTrend.push({
         id: current.id,
-
         skin_type_code: current.skin_type.code,
         overall_score: current.overall_score
           ? Number(current.overall_score)
