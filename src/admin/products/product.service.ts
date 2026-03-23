@@ -139,7 +139,7 @@ export class ProductsService {
     const monthly: Record<string, number> = {};
 
     for (const p of products) {
-      const month = p.created_at.toISOString().slice(0, 7); // YYYY-MM
+      const month = p.created_at.toISOString().slice(0, 7);
 
       if (!monthly[month]) {
         monthly[month] = 0;
@@ -148,11 +148,16 @@ export class ProductsService {
       monthly[month]++;
     }
 
-    return Object.entries(monthly)
+    const monthlyData = Object.entries(monthly)
       .map(([month, count]) => ({
         month,
         totalProducts: count,
       }))
       .sort((a, b) => a.month.localeCompare(b.month));
+
+    return {
+      totalProducts: products.length,
+      monthly: monthlyData,
+    };
   }
 }
