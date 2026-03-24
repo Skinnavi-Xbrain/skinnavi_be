@@ -64,7 +64,8 @@ model affiliate_products {
   affiliate_url String
   image_url     String?
   is_active     Boolean               @default(true)
-
+  created_at    DateTime  @default(now())
+  
   combo_products combo_products[]
   routine_steps  user_routine_steps[]
 }

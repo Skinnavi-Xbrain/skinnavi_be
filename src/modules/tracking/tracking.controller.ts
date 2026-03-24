@@ -93,6 +93,16 @@ export class TrackingController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('')
+  @Get('latest/daily-logs')
+  async getLatestDailyLogs(
+    @GetUser('id') userId: string,
+  ): Promise<SimpleResponse<any>> {
+    const data = await this.trackingService.getTodayDailyLogs(userId);
+    return new SimpleResponse(data, 'Get today subscription daily logs', 200);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('')
   @Get('skin-analyses')
   async getUserSkinAnalyses(
     @GetUser('id') userId: string,

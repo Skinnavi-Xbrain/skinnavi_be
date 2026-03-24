@@ -4,12 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { subscription_status_enum } from '@prisma/client';
+import {
+  UpdateProfileDto,
+  UserProfileResponseDto,
+} from './dto/user-profile.dto';
 
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
 
-  async getProfile(userId: string) {
+  async getProfile(userId: string): Promise<UserProfileResponseDto> {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
     });
@@ -18,30 +23,50 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    // lấy skin analysis mới nhất
     const skinAnalysis = await this.prisma.skin_analyses.findFirst({
       where: { user_id: userId },
       orderBy: { created_at: 'desc' },
-      include: {
-        skin_type: true,
-      },
+      include: { skin_type: true },
     });
 
-    // lấy subscription active
     const subscription = await this.prisma.user_package_subscriptions.findFirst(
       {
         where: {
           user_id: userId,
-          status: 'ACTIVE',
+          status: subscription_status_enum.ACTIVE,
         },
         include: {
           routine_package: true,
         },
-        orderBy: {
-          created_at: 'desc',
-        },
+        orderBy: { created_at: 'desc' },
       },
     );
+
+    let scanUsage = {
+      totalLimit: 0,
+      used: 0,
+      remaining: 0,
+    };
+
+    if (subscription) {
+      const usedScans = await this.prisma.skin_analyses.count({
+        where: {
+          user_id: userId,
+          created_at: {
+            gte: subscription.start_date,
+            lte: subscription.end_date,
+          },
+        },
+      });
+
+      const limit = subscription.routine_package.total_scan_limit;
+
+      scanUsage = {
+        totalLimit: limit,
+        used: usedScans,
+        remaining: Math.max(0, limit - usedScans),
+      };
+    }
 
     return {
       user: {
@@ -49,34 +74,28 @@ export class UserService {
         email: user.email,
         fullName: user.full_name,
         avatar: user.avatar_url,
+        created_at: user.created_at,
       },
-
       skinType: skinAnalysis
         ? {
             id: skinAnalysis.skin_type.id,
             name: skinAnalysis.skin_type.code,
           }
-        : 'User hasn’t analyzed the skin yet',
-
+        : 'User has not analyzed the skin yet',
       currentPackage: subscription
         ? {
             id: subscription.routine_package.id,
             name: subscription.routine_package.package_name,
-            price: subscription.routine_package.price,
+            price: Number(subscription.routine_package.price),
             startDate: subscription.start_date,
             endDate: subscription.end_date,
+            scanDetails: scanUsage,
           }
-        : 'User hasn’t subscribed to a plan yet',
+        : 'User has not subscribed to a plan yet',
     };
   }
 
-  async updateProfile(
-    userId: string,
-    data: {
-      fullName?: string;
-      avatar?: string;
-    },
-  ) {
+  async updateProfile(userId: string, data: UpdateProfileDto) {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
     });
@@ -96,22 +115,10 @@ export class UserService {
 
   async getMySubscriptions(userId: string) {
     const subs = await this.prisma.user_package_subscriptions.findMany({
-      where: {
-        user_id: userId,
-      },
-      include: {
-        routine_package: true,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
+      where: { user_id: userId },
+      include: { routine_package: true },
+      orderBy: { created_at: 'desc' },
     });
-
-    if (!subs.length) {
-      return {
-        message: 'User hasn’t subscribed to a plan yet',
-      };
-    }
 
     return subs.map((s) => ({
       id: s.id,
@@ -121,7 +128,7 @@ export class UserService {
       package: {
         id: s.routine_package.id,
         name: s.routine_package.package_name,
-        price: s.routine_package.price,
+        price: Number(s.routine_package.price),
       },
     }));
   }
@@ -131,23 +138,16 @@ export class UserService {
       where: { id: subscriptionId },
     });
 
-    if (!sub) {
-      throw new NotFoundException('Subscription not found');
-    }
-
-    if (sub.user_id !== userId) {
+    if (!sub) throw new NotFoundException('Subscription not found');
+    if (sub.user_id !== userId)
       throw new BadRequestException('Not your subscription');
-    }
-
-    if (sub.status !== 'ACTIVE') {
+    if (sub.status !== subscription_status_enum.ACTIVE) {
       throw new BadRequestException('Subscription is not active');
     }
 
     return this.prisma.user_package_subscriptions.update({
       where: { id: subscriptionId },
-      data: {
-        status: 'CANCELED',
-      },
+      data: { status: subscription_status_enum.CANCELED },
     });
   }
 }
