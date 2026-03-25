@@ -1,15 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ValidateSubscriptionResponse } from './dto/package-subscriptions.dto';
 import { Order } from '@Constant/index';
 import { subscription_status_enum } from '@prisma/client';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class PackageSubscriptionsService {
+  private readonly logger = new Logger(PackageSubscriptionsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async validateSubscription(
@@ -93,5 +97,30 @@ export class PackageSubscriptionsService {
         selected_combo: true,
       },
     });
+  }
+
+  @Cron(CronExpression.EVERY_10_SECONDS)
+  async handleExpireSubscriptions() {
+    const now = new Date();
+
+    const result = await this.prisma.user_package_subscriptions.updateMany({
+      where: {
+        end_date: {
+          lt: now,
+        },
+        status: {
+          in: ['ACTIVE', 'CANCELED'],
+        },
+      },
+      data: {
+        status: 'EXPIRED',
+      },
+    });
+
+    if (result.count > 0) {
+      this.logger.debug(
+        `[CRON] Expired subscriptions updated: ${result.count}`,
+      );
+    }
   }
 }

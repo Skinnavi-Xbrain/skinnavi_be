@@ -24,6 +24,10 @@ export class ProductsController {
   getProducts(@Query('page') page = 1, @Query('limit') limit = 10) {
     return this.service.getProducts(Number(page), Number(limit));
   }
+  @Get('stats/monthly')
+  getStats(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.getProductStatsByMonth({ from, to });
+  }
 
   @Get(':id')
   getDetail(@Param('id') id: string) {

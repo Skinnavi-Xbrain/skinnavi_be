@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Order } from '@Constant/enums';
 
 @Injectable()
 export class CombosService {
@@ -18,10 +19,10 @@ export class CombosService {
             include: {
               product: true,
             },
-            orderBy: { step_order: 'asc' },
+            orderBy: { step_order: Order.ASC },
           },
         },
-        orderBy: { combo_name: 'asc' },
+        orderBy: { created_at: Order.DESC },
       }),
       this.prisma.skincare_combos.count(),
     ]);
@@ -43,7 +44,7 @@ export class CombosService {
           include: {
             product: true,
           },
-          orderBy: { step_order: 'asc' },
+          orderBy: { step_order: Order.ASC },
         },
       },
     });
@@ -91,7 +92,7 @@ export class CombosService {
       include: {
         combo_products: {
           include: { product: true },
-          orderBy: { step_order: 'asc' },
+          orderBy: { step_order: Order.ASC },
         },
       },
     });
@@ -152,7 +153,7 @@ export class CombosService {
       include: {
         combo_products: {
           include: { product: true },
-          orderBy: { step_order: 'asc' },
+          orderBy: { step_order: Order.ASC },
         },
       },
     });
