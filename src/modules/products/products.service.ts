@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PageOptionsDto } from '../../common/dtos/page-options.dto';
+import { Order } from '@Constant/index';
 
 @Injectable()
 export class ProductsService {
@@ -21,7 +22,7 @@ export class ProductsService {
         },
         take: take,
         skip: skip,
-        orderBy: { name: 'asc' },
+        orderBy: { name: Order.ASC },
       }),
       this.prisma.affiliate_products.count({ where: { is_active: true } }),
     ]);

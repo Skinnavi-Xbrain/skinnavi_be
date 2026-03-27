@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Order } from '@Constant/index';
 
 @Injectable()
 export class TrackingService implements OnModuleInit {
@@ -19,10 +20,13 @@ export class TrackingService implements OnModuleInit {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        is_active: true,
-        end_date: { gt: new Date() },
       },
-      include: { routine_package: true },
+      orderBy: {
+        created_at: Order.DESC,
+      },
+      include: {
+        routine_package: true,
+      },
     });
 
     if (!activeSub) {
@@ -50,16 +54,30 @@ export class TrackingService implements OnModuleInit {
     }
   }
 
+  private toDateOnly(date: Date): Date {
+    return new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+  }
+
   async createAndCheckDailyLogs(): Promise<{
     created: number;
     checked: number;
     logs: any[];
   }> {
     const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = this.toDateOnly(now);
+
+    const todayEnd = new Date(today);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     const activeRoutines = await this.prisma.user_routines.findMany({
       where: {
@@ -79,28 +97,34 @@ export class TrackingService implements OnModuleInit {
 
     for (const routine of activeRoutines) {
       try {
-        const routineStartDate = new Date(routine.created_at);
-        routineStartDate.setHours(0, 0, 0, 0);
+        const routineStartDate = this.toDateOnly(new Date(routine.created_at));
 
-        const subscriptionEndDate = new Date(routine.subscription.end_date);
-        subscriptionEndDate.setHours(23, 59, 59, 999);
+        const subscriptionEndDate = new Date(
+          this.toDateOnly(new Date(routine.subscription.end_date)),
+        );
+        subscriptionEndDate.setUTCHours(23, 59, 59, 999);
+
+        const subStart = this.toDateOnly(
+          new Date(routine.subscription.start_date),
+        );
 
         const startDate =
-          routineStartDate > new Date(routine.subscription.start_date)
-            ? routineStartDate
-            : new Date(routine.subscription.start_date);
+          routineStartDate > subStart ? routineStartDate : subStart;
 
         const endDate =
           today < subscriptionEndDate ? today : subscriptionEndDate;
 
         const currentDate = new Date(startDate);
+
         while (currentDate <= endDate) {
-          const logDate = new Date(currentDate);
+          const logDate = this.toDateOnly(currentDate);
 
           const existingLog = await this.prisma.routine_daily_logs.findFirst({
             where: {
               user_routine_id: routine.id,
-              log_date: logDate,
+              log_date: {
+                equals: logDate,
+              },
             },
           });
 
@@ -118,7 +142,7 @@ export class TrackingService implements OnModuleInit {
             totalCreated++;
           }
 
-          currentDate.setDate(currentDate.getDate() + 1);
+          currentDate.setUTCDate(currentDate.getUTCDate() + 1);
         }
       } catch (error) {
         this.logger.error(
@@ -131,125 +155,153 @@ export class TrackingService implements OnModuleInit {
     this.logger.log(
       `Checked ${totalChecked} logs, created ${totalCreated} new logs`,
     );
+
     return { created: totalCreated, checked: totalChecked, logs: allLogs };
   }
 
   private async createDailyLogsForToday() {
     const now = new Date();
     const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
+
     const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     const activeRoutines = await this.prisma.user_routines.findMany({
       where: {
         subscription: {
           start_date: { lte: todayEnd },
           end_date: { gte: today },
+          status: { in: ['ACTIVE', 'CANCELED'] },
         },
       },
+      select: { id: true },
     });
 
-    const results: any[] = [];
-    for (const routine of activeRoutines) {
-      try {
-        const existingLog = await this.prisma.routine_daily_logs.findFirst({
-          where: {
-            user_routine_id: routine.id,
-            log_date: today,
-          },
-        });
-
-        if (!existingLog) {
-          const newLog = await this.prisma.routine_daily_logs.create({
-            data: {
-              user_routine_id: routine.id,
-              log_date: today,
-              is_completed: false,
-            },
-          });
-          results.push(newLog);
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to create today's log for routine ${routine.id}:`,
-          error,
-        );
-      }
+    if (activeRoutines.length === 0) {
+      return { created: 0, message: 'No active routines found for today' };
     }
 
-    if (results.length > 0) {
-      this.logger.log(`Created ${results.length} daily logs for today`);
+    const existingLogs = await this.prisma.routine_daily_logs.findMany({
+      where: {
+        log_date: today,
+        user_routine_id: { in: activeRoutines.map((r) => r.id) },
+      },
+      select: { user_routine_id: true },
+    });
+
+    const existingRoutineIds = new Set(
+      existingLogs.map((l) => l.user_routine_id),
+    );
+
+    const routinesToCreate = activeRoutines
+      .filter((r) => !existingRoutineIds.has(r.id))
+      .map((r) => ({
+        user_routine_id: r.id,
+        log_date: today,
+        is_completed: false,
+      }));
+
+    if (routinesToCreate.length === 0) {
+      return { created: 0, message: 'All logs already exist' };
     }
-    return { created: results.length, logs: results };
+
+    const result = await this.prisma.routine_daily_logs.createMany({
+      data: routinesToCreate,
+      skipDuplicates: true,
+    });
+
+    this.logger.log(
+      `[CRON] Created ${result.count} daily logs for ${today.toISOString().split('T')[0]}`,
+    );
+    return { created: result.count };
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async createDailyLogs() {
     const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
+    const today = this.toDateOnly(now);
 
-    const activeRoutines = await this.prisma.user_routines.findMany({
-      where: {
-        subscription: {
+    const todayEnd = new Date(today);
+    todayEnd.setUTCHours(23, 59, 59, 999);
+
+    const latestSubscriptions =
+      await this.prisma.user_package_subscriptions.findMany({
+        where: {
+          status: 'ACTIVE',
+          routine_package: {
+            duration_days: {
+              in: [30, 90],
+            },
+          },
           start_date: { lte: todayEnd },
           end_date: { gte: today },
         },
-      },
-      include: {
-        subscription: true,
-      },
-    });
+        orderBy: {
+          created_at: 'desc',
+        },
+        include: {
+          routine_package: true,
+          routines: true,
+        },
+        distinct: ['user_id'],
+      });
 
     const results: any[] = [];
-    for (const routine of activeRoutines) {
-      try {
-        const routineStartDate = new Date(routine.created_at);
-        routineStartDate.setHours(0, 0, 0, 0);
 
-        const subscriptionEndDate = new Date(routine.subscription.end_date);
-        subscriptionEndDate.setHours(23, 59, 59, 999);
+    for (const subscription of latestSubscriptions) {
+      for (const routine of subscription.routines) {
+        try {
+          const routineStartDate = this.toDateOnly(
+            new Date(routine.created_at),
+          );
 
-        const startDate =
-          routineStartDate > new Date(routine.subscription.start_date)
-            ? routineStartDate
-            : new Date(routine.subscription.start_date);
+          const subscriptionEndDate = new Date(
+            this.toDateOnly(new Date(subscription.end_date)),
+          );
+          subscriptionEndDate.setUTCHours(23, 59, 59, 999);
 
-        const endDate =
-          today < subscriptionEndDate ? today : subscriptionEndDate;
+          const subStart = this.toDateOnly(new Date(subscription.start_date));
 
-        const currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-          const logDate = new Date(currentDate);
+          const startDate =
+            routineStartDate > subStart ? routineStartDate : subStart;
 
-          const existingLog = await this.prisma.routine_daily_logs.findFirst({
-            where: {
-              user_routine_id: routine.id,
-              log_date: logDate,
-            },
-          });
+          const endDate =
+            today < subscriptionEndDate ? today : subscriptionEndDate;
 
-          if (!existingLog) {
-            const newLog = await this.prisma.routine_daily_logs.create({
-              data: {
+          const currentDate = new Date(startDate);
+
+          while (currentDate <= endDate) {
+            const logDate = this.toDateOnly(currentDate);
+
+            const existingLog = await this.prisma.routine_daily_logs.findFirst({
+              where: {
                 user_routine_id: routine.id,
-                log_date: logDate,
-                is_completed: false,
+                log_date: {
+                  equals: logDate,
+                },
               },
             });
-            results.push(newLog);
-          }
 
-          currentDate.setDate(currentDate.getDate() + 1);
+            if (!existingLog) {
+              const newLog = await this.prisma.routine_daily_logs.create({
+                data: {
+                  user_routine_id: routine.id,
+                  log_date: logDate,
+                  is_completed: false,
+                },
+              });
+              results.push(newLog);
+            }
+
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to create logs for routine ${routine.id}:`,
+            error,
+          );
         }
-      } catch (error) {
-        this.logger.error(
-          `Failed to create logs for routine ${routine.id}:`,
-          error,
-        );
       }
     }
 
@@ -259,15 +311,59 @@ export class TrackingService implements OnModuleInit {
   async updateDailyLog(logId: string, is_completed: boolean) {
     const log = await this.prisma.routine_daily_logs.findUnique({
       where: { id: logId },
+      include: { user_routine: true },
     });
 
-    if (!log) {
-      throw new NotFoundException('Daily log not found');
+    if (!log) throw new NotFoundException('Daily log not found');
+
+    const now = new Date();
+
+    if (is_completed) {
+      const routineTime = log.user_routine.routine_time;
+
+      const logDate = new Date(log.log_date);
+      const logYear = logDate.getUTCFullYear();
+      const logMonth = logDate.getUTCMonth();
+      const logDay = logDate.getUTCDate();
+
+      const isSameDay =
+        now.getUTCFullYear() === logYear &&
+        now.getUTCMonth() === logMonth &&
+        now.getUTCDate() === logDay;
+
+      if (!isSameDay) {
+        throw new BadRequestException(
+          `This log is for ${logYear}-${logMonth + 1}-${logDay}. You can only check-in for today.`,
+        );
+      }
+
+      const morningEnd = new Date(now);
+      morningEnd.setUTCHours(12, 0, 0, 0);
+
+      const eveningStart = new Date(now);
+      eveningStart.setUTCHours(12, 0, 0, 0);
+
+      if (routineTime === 'MORNING') {
+        if (now >= morningEnd) {
+          throw new BadRequestException(
+            'Morning routine expired (Deadline: 12:00 PM)',
+          );
+        }
+      } else if (routineTime === 'EVENING') {
+        if (now < eveningStart) {
+          throw new BadRequestException(
+            'Evening routine has not started yet (Starts at 12:00 PM)',
+          );
+        }
+      }
     }
 
     return this.prisma.routine_daily_logs.update({
       where: { id: logId },
-      data: { is_completed },
+      data: {
+        is_completed,
+        completed_at: is_completed ? now : null,
+      },
     });
   }
 
@@ -280,47 +376,38 @@ export class TrackingService implements OnModuleInit {
       where: { id: userId },
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
-    // Parse dates with fallback to full range if not provided
-    let start: Date | null = null;
-    let end: Date | null = null;
+    let start: Date | undefined;
+    let end: Date | undefined;
 
     if (startDate) {
       start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
     }
 
     if (endDate) {
       end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      end.setUTCHours(23, 59, 59, 999);
     }
 
-    // Get all skin analyses with metrics (for trend analysis)
     const skinAnalyses = await this.prisma.skin_analyses.findMany({
-      where: { user_id: userId },
-      include: {
-        skin_type: true,
-        metrics: true,
+      where: {
+        user_id: userId,
+        ...(start && end ? { created_at: { gte: start, lte: end } } : {}),
       },
-      orderBy: { created_at: 'desc' },
+      include: { skin_type: true, metrics: true },
+      orderBy: { created_at: Order.DESC },
     });
 
-    // Build skin analyses with trend calculation
-    const analyzesWithTrend: any[] = [];
-    for (let i = 0; i < skinAnalyses.length; i++) {
-      const current = skinAnalyses[i];
+    const analyzesWithTrend = skinAnalyses.map((current, i) => {
       const previous = skinAnalyses[i + 1];
-
       let scoreTrend: number | null = null;
       if (current.overall_score && previous?.overall_score) {
         scoreTrend =
           Number(current.overall_score) - Number(previous.overall_score);
       }
-
-      analyzesWithTrend.push({
+      return {
         id: current.id,
         skin_type_code: current.skin_type.code,
         overall_score: current.overall_score
@@ -334,10 +421,9 @@ export class TrackingService implements OnModuleInit {
           metric_type: m.metric_type,
           score: m.score ? Number(m.score) : null,
         })),
-      });
-    }
+      };
+    });
 
-    // Get all routines with daily logs (filter logs by date range)
     const subscriptions = await this.prisma.user_package_subscriptions.findMany(
       {
         where: { user_id: userId },
@@ -347,54 +433,51 @@ export class TrackingService implements OnModuleInit {
               daily_logs: {
                 where:
                   start && end ? { log_date: { gte: start, lte: end } } : {},
-                orderBy: { log_date: 'asc' },
+                orderBy: { log_date: Order.ASC },
               },
             },
-            orderBy: { routine_time: 'asc' },
+            orderBy: { routine_time: Order.ASC },
           },
         },
       },
     );
 
-    // Build routines array (separated from skin analyses)
-    const routines: any[] = [];
+    const routinesOverview = subscriptions.flatMap((sub) =>
+      sub.routines.map((routine) => {
+        const daily_logs = routine.daily_logs.map((log) => ({
+          id: log.id,
+          log_date: log.log_date.toISOString(),
+          is_completed: log.is_completed,
+        }));
 
-    for (const subscription of subscriptions) {
-      for (const routine of subscription.routines) {
-        const completedCount = routine.daily_logs.filter(
-          (log) => log.is_completed,
-        ).length;
-
-        routines.push({
+        return {
           routine_id: routine.id,
           routine_time: routine.routine_time,
-          routine_created_at: routine.created_at.toISOString(),
-          subscription_id: subscription.id,
-          subscription_start_date: subscription.start_date
-            .toISOString()
-            .split('T')[0],
-          subscription_end_date: subscription.end_date
-            .toISOString()
-            .split('T')[0],
-          daily_logs: routine.daily_logs.map((log) => ({
-            id: log.id,
-            user_routine_id: log.user_routine_id,
-            log_date: log.log_date.toISOString().split('T')[0],
-            is_completed: log.is_completed,
-          })),
-          completed_count: completedCount,
-          total_count: routine.daily_logs.length,
-        });
-      }
-    }
+          subscription_id: sub.id,
+          subscription_dates: {
+            start: sub.start_date.toISOString().split('T')[0],
+            end: sub.end_date.toISOString().split('T')[0],
+          },
+          daily_logs,
+          completed_count: daily_logs.filter((l) => l.is_completed).length,
+          total_count: daily_logs.length,
+        };
+      }),
+    );
 
     return {
-      user_id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      avatar_url: user.avatar_url,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+      },
+      filter: {
+        start_date: start?.toISOString().split('T')[0] || null,
+        end_date: end?.toISOString().split('T')[0] || null,
+      },
       skin_analyses: analyzesWithTrend,
-      routines,
+      routines: routinesOverview,
     };
   }
 
@@ -407,17 +490,17 @@ export class TrackingService implements OnModuleInit {
       throw new NotFoundException('User not found');
     }
 
-    let start: Date | null = null;
-    let end: Date | null = null;
+    let start: Date | undefined;
+    let end: Date | undefined;
 
     if (startDate) {
       start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
     }
 
     if (endDate) {
       end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      end.setUTCHours(23, 59, 59, 999);
     }
 
     const subscriptions = await this.prisma.user_package_subscriptions.findMany(
@@ -438,35 +521,33 @@ export class TrackingService implements OnModuleInit {
       },
     );
 
-    const routines: any[] = [];
-    for (const subscription of subscriptions) {
-      for (const routine of subscription.routines) {
-        const completedCount = routine.daily_logs.filter(
-          (log) => log.is_completed,
-        ).length;
+    const routines = subscriptions.flatMap((subscription) =>
+      subscription.routines.map((routine) => {
+        const logs = routine.daily_logs.map((log) => ({
+          id: log.id,
+          user_routine_id: log.user_routine_id,
+          log_date: log.log_date.toISOString(),
+          is_completed: log.is_completed,
+          completed_at: log.completed_at
+            ? log.completed_at.toISOString()
+            : null,
+        }));
 
-        routines.push({
+        return {
           routine_id: routine.id,
           routine_time: routine.routine_time,
           routine_created_at: routine.created_at.toISOString(),
           subscription_id: subscription.id,
-          subscription_start_date: subscription.start_date
-            .toISOString()
-            .split('T')[0],
-          subscription_end_date: subscription.end_date
-            .toISOString()
-            .split('T')[0],
-          daily_logs: routine.daily_logs.map((log) => ({
-            id: log.id,
-            user_routine_id: log.user_routine_id,
-            log_date: log.log_date.toISOString().split('T')[0],
-            is_completed: log.is_completed,
-          })),
-          completed_count: completedCount,
-          total_count: routine.daily_logs.length,
-        });
-      }
-    }
+          subscription_period: {
+            start: subscription.start_date.toISOString().split('T')[0],
+            end: subscription.end_date.toISOString().split('T')[0],
+          },
+          daily_logs: logs,
+          completed_count: logs.filter((l) => l.is_completed).length,
+          total_count: logs.length,
+        };
+      }),
+    );
 
     return {
       user_id: user.id,
@@ -474,7 +555,7 @@ export class TrackingService implements OnModuleInit {
     };
   }
 
-  async getUserSkinAnalyses(userId: string, days: number = 7) {
+  async getTodayDailyLogs(userId: string) {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
     });
@@ -483,45 +564,146 @@ export class TrackingService implements OnModuleInit {
       throw new NotFoundException('User not found');
     }
 
+    const today = this.toDateOnly(new Date());
+
+    const latestSubscription =
+      await this.prisma.user_package_subscriptions.findFirst({
+        where: { user_id: userId },
+        orderBy: { created_at: Order.DESC },
+        include: {
+          routine_package: true,
+          routines: {
+            include: {
+              daily_logs: {
+                where: {
+                  log_date: {
+                    equals: today,
+                  },
+                },
+              },
+            },
+            orderBy: { created_at: Order.DESC },
+          },
+        },
+      });
+
+    if (!latestSubscription || latestSubscription.routines.length === 0) {
+      return {
+        user_id: user.id,
+        type: 'NO_SUBSCRIPTION',
+        routines: [],
+      };
+    }
+
+    const duration = latestSubscription.routine_package?.duration_days;
+    if (duration === 7) {
+      return {
+        user_id: user.id,
+        type: 'WEEKLY_NO_LOG',
+        routines: [],
+      };
+    }
+
+    const latestRoutineCreatedAt = latestSubscription.routines[0].created_at;
+    const latestRoutines = latestSubscription.routines.filter((r) => {
+      const diffInSeconds =
+        Math.abs(r.created_at.getTime() - latestRoutineCreatedAt.getTime()) /
+        1000;
+      return diffInSeconds < 5;
+    });
+
+    const routinesResult: any[] = [];
+
+    for (const routine of latestRoutines) {
+      const todayLog = routine.daily_logs[0];
+
+      if (todayLog) {
+        routinesResult.push({
+          routine_id: routine.id,
+          routine_time: routine.routine_time,
+          routine_created_at: routine.created_at.toISOString(),
+          daily_log: {
+            id: todayLog.id,
+            user_routine_id: todayLog.user_routine_id,
+            log_date: todayLog.log_date.toISOString(),
+            is_completed: todayLog.is_completed,
+          },
+          is_completed: todayLog.is_completed,
+        });
+      }
+    }
+
+    if (routinesResult.length === 0) {
+      return {
+        user_id: user.id,
+        type: 'NO_LOG_TODAY',
+        routines: [],
+      };
+    }
+
+    // Sắp xếp lại theo MORNING/EVENING để hiển thị đúng thứ tự cho user
+    routinesResult.sort((a, b) => a.routine_time.localeCompare(b.routine_time));
+
+    return {
+      user_id: user.id,
+      type: 'HAS_LOG',
+      routines: routinesResult,
+    };
+  }
+
+  async getUserSkinAnalyses(userId: string, days: number = 7) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
     const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    end.setUTCHours(23, 59, 59, 999);
+
     const start = new Date(end);
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    start.setUTCHours(0, 0, 0, 0);
 
     const skinAnalyses = await this.prisma.skin_analyses.findMany({
       where: {
         user_id: userId,
-        created_at: { gte: start },
+        created_at: {
+          gte: start,
+          lte: end,
+        },
       },
       include: {
         skin_type: true,
         metrics: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
     });
+
+    const baseResponse = {
+      user_id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      start_date: start.toISOString().split('T')[0],
+      end_date: end.toISOString().split('T')[0],
+    };
 
     if (skinAnalyses.length < 2) {
       return {
-        user_id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        avatar_url: user.avatar_url,
+        ...baseResponse,
         skin_analyses: [],
-        start_date: start.toISOString().split('T')[0],
-        end_date: end.toISOString().split('T')[0],
-        message: `At least 2 analyses are required between ${
-          start.toISOString().split('T')[0]
-        } and ${end.toISOString().split('T')[0]}`,
+        message: `At least 2 analyses are required to show trends (Found: ${skinAnalyses.length})`,
       };
     }
 
     const analyzesWithTrend: any[] = [];
+
     for (let i = 0; i < skinAnalyses.length; i++) {
       const current = skinAnalyses[i];
       const previous = skinAnalyses[i + 1];
-
       let scoreTrend: number | null = null;
+
       if (current.overall_score && previous?.overall_score) {
         scoreTrend =
           Number(current.overall_score) - Number(previous.overall_score);

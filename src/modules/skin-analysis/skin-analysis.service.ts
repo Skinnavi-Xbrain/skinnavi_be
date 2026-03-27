@@ -6,10 +6,15 @@ import {
 } from '@nestjs/common';
 import { GoogleGenAI, createUserContent } from '@google/genai';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma, skin_metric_enum } from '@prisma/client';
+import {
+  Prisma,
+  skin_metric_enum,
+  subscription_status_enum,
+} from '@prisma/client';
 import crypto from 'crypto';
 import { AIAnalysisResult, analysisResultSchema } from './skin-analysis.schema';
 import { ApiKeyManagerService } from '../../common/aipKeyManager/api-key-manager.service';
+import { Order } from '@Constant/index';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -25,11 +30,14 @@ export class SkinAnalysisService {
   async checkAnalysisLimit(userId: string) {
     const now = new Date();
 
+    const startOfDay = new Date(now);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     const todayAnalysis = await this.prisma.skin_analyses.findFirst({
       where: {
         user_id: userId,
         created_at: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          gte: startOfDay,
         },
       },
     });
@@ -43,67 +51,52 @@ export class SkinAnalysisService {
     const activeSub = await this.prisma.user_package_subscriptions.findFirst({
       where: {
         user_id: userId,
-        is_active: true,
+        status: {
+          in: [
+            subscription_status_enum.ACTIVE,
+            subscription_status_enum.CANCELED,
+          ],
+        },
         end_date: { gt: now },
+        start_date: { lt: now },
       },
       include: { routine_package: true },
+      orderBy: { created_at: 'desc' },
     });
 
     if (!activeSub) {
       return;
     }
 
-    const duration = activeSub.routine_package.duration_days;
-
-    const startOfWeek = new Date();
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const totalAnalyses = await this.prisma.skin_analyses.count({
+    const totalAnalysesInCurrentSub = await this.prisma.skin_analyses.count({
       where: {
         user_id: userId,
-        created_at: { gte: activeSub.start_date, lte: activeSub.end_date },
+        created_at: {
+          gte: activeSub.start_date,
+          lte: activeSub.end_date,
+        },
       },
     });
 
-    const weeklyAnalyses = await this.prisma.skin_analyses.count({
-      where: {
-        user_id: userId,
-        created_at: { gte: startOfWeek },
-      },
-    });
+    const limit = activeSub.routine_package.total_scan_limit;
 
-    if (duration <= 7) {
-      if (totalAnalyses >= 1) {
-        throw new BadRequestException(
-          'The Free Trial allows only 1 skin analysis. Please upgrade to a paid package for more analyses.',
-        );
-      }
-    } else if (duration <= 30) {
-      if (weeklyAnalyses >= 3) {
-        throw new BadRequestException(
-          'The Essential Routine allows only 3 analyses per week. Please wait until next week or upgrade to the Advanced Routine for more frequent analyses.',
-        );
-      }
-    } else if (duration <= 90) {
-      if (weeklyAnalyses >= 5) {
-        throw new BadRequestException(
-          'The Advanced Routine allows only 5 analyses per week. Please wait until next week for more analyses.',
-        );
-      }
+    if (totalAnalysesInCurrentSub >= limit) {
+      throw new BadRequestException(
+        `Your current package "${activeSub.routine_package.package_name}" has reached its limit of ${limit} analyses. Please upgrade or renew.`,
+      );
     }
 
     this.logger.debug({
-      startDate: activeSub.start_date,
-      endDate: activeSub.end_date,
-      totalAnalyses,
-      duration: activeSub.routine_package.duration_days,
+      message: 'Analysis limit check passed',
+      packageName: activeSub.routine_package.package_name,
+      used: totalAnalysesInCurrentSub,
+      limit: limit,
     });
   }
 
   private async generateContentWithRetry(modelName: string, params: any) {
     let attempts = 0;
-    const maxAttempts = this.apiKeyManager.totalKeys;
+    const maxAttempts = this.apiKeyManager.totalKeys * 2;
 
     while (attempts < maxAttempts) {
       const apiKey = this.apiKeyManager.getCurrentKey();
@@ -118,26 +111,40 @@ export class SkinAnalysisService {
           ...params,
         });
       } catch (error: any) {
+        const status = error?.status;
+        const message = error?.message?.toLowerCase() || '';
+
         if (
-          error?.status === 429 ||
-          error?.message?.includes('429') ||
-          error?.message?.toLowerCase().includes('quota')
+          status === 429 ||
+          message.includes('429') ||
+          message.includes('quota')
         ) {
-          this.logger.warn(
-            `API Key index ${attempts} exhausted. Switching to next key...`,
-          );
+          this.logger.warn(`API key quota exceeded. Switching to next key...`);
 
           this.apiKeyManager.getNextKey();
           attempts++;
-        } else {
-          this.logger.error(`AI Generation error: ${error.message}`);
-          throw error;
+          continue;
         }
+
+        if (status === 503 || message.includes('high demand')) {
+          const delay = Math.min((attempts + 1) * 2000, 10000);
+
+          this.logger.warn(
+            `Gemini model overloaded. Retrying in ${delay}ms...`,
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          attempts++;
+          continue;
+        }
+
+        this.logger.error(`AI Generation error: ${error.message}`);
+        throw error;
       }
     }
 
     throw new BadRequestException(
-      'All GEMINI API keys have exceeded their quota for today.',
+      'Gemini AI service unavailable or all API keys exhausted.',
     );
   }
 
@@ -214,7 +221,7 @@ export class SkinAnalysisService {
 
     const last = await this.prisma.skin_analyses.findFirst({
       where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: Order.DESC },
       include: { metrics: true, skin_type: true },
     });
 
@@ -345,15 +352,6 @@ ${Object.entries(metrics)
     };
   }
 
-  // private async fetchImageAsBase64(imageUrl: string) {
-  //   const res = await fetch(imageUrl);
-  //   if (!res.ok) {
-  //     throw new BadRequestException(`Cannot fetch image: ${res.status}`);
-  //   }
-  //   const buf = await res.arrayBuffer();
-  //   return Buffer.from(buf).toString('base64');
-  // }
-
   private parseAIResponse(text: string): AIAnalysisResult {
     const cleaned = text
       .replace(/```json/gi, '')
@@ -376,6 +374,65 @@ ${Object.entries(metrics)
     }
 
     return parsed.data;
+  }
+
+  async getLatestSkinAnalysis(userId: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const skinAnalysis = await this.prisma.skin_analyses.findFirst({
+      where: {
+        user_id: userId,
+      },
+      include: {
+        skin_type: true,
+        metrics: true,
+      },
+      orderBy: {
+        created_at: Order.DESC,
+      },
+    });
+
+    if (!skinAnalysis) {
+      return null;
+    }
+
+    const recommendedCombos = await this.prisma.skincare_combos.findMany({
+      where: {
+        skin_type_id: skinAnalysis.skin_type_id,
+        is_active: true,
+      },
+      select: { id: true },
+      take: 4,
+    });
+
+    const metricsObject = skinAnalysis.metrics.reduce(
+      (acc, m) => {
+        acc[m.metric_type] = m.score ? Number(m.score) : null;
+        return acc;
+      },
+      {} as Record<string, number | null>,
+    );
+
+    return {
+      analysisId: skinAnalysis.id,
+      result: {
+        isValidImage: true,
+        imageUrl: skinAnalysis.face_image_url,
+        skinType: skinAnalysis.skin_type.code,
+        overallScore: skinAnalysis.overall_score
+          ? Number(skinAnalysis.overall_score)
+          : null,
+        metrics: metricsObject,
+        overallComment: skinAnalysis.overall_comment,
+        recommendedCombos: recommendedCombos.map((c) => c.id),
+      },
+    };
   }
 }
 

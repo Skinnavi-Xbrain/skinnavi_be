@@ -7,6 +7,10 @@ import { AdminSubscriptionsController } from './subscriptions/subscriptions.cont
 import { AdminUsersService } from './users/users.service';
 import { AdminRevenueService } from './revenue/revenue.service';
 import { AdminSubscriptionsService } from './subscriptions/subscriptions.service';
+import { ProductsController } from './products/product.controller';
+import { ProductsService } from './products/product.service';
+import { CombosController } from './combos/combo.controller';
+import { CombosService } from './combos/combo.service';
 
 @Module({
   imports: [PrismaModule, AuthModule],
@@ -14,11 +18,15 @@ import { AdminSubscriptionsService } from './subscriptions/subscriptions.service
     AdminUsersController,
     AdminRevenueController,
     AdminSubscriptionsController,
+    ProductsController,
+    CombosController,
   ],
   providers: [
     AdminUsersService,
     AdminRevenueService,
     AdminSubscriptionsService,
+    ProductsService,
+    CombosService,
   ],
 })
 export class AdminModule {}

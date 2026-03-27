@@ -5,7 +5,7 @@ CREATE TYPE "user_role_enum" AS ENUM ('USER', 'ADMIN');
 CREATE TYPE "skin_type_enum" AS ENUM ('NORMAL', 'DRY', 'COMBINATION', 'SENSITIVE', 'OILY');
 
 -- CreateEnum
-CREATE TYPE "skin_metric_enum" AS ENUM ('PORES', 'ACNE', 'DARK_CIRCLES', 'DARK_SPOTS', 'WRINKLES');
+CREATE TYPE "skin_metric_enum" AS ENUM ('PORES', 'ACNE', 'DARK_CIRCLES', 'DARK_SPOTS');
 
 -- CreateEnum
 CREATE TYPE "routine_time_enum" AS ENUM ('MORNING', 'EVENING');

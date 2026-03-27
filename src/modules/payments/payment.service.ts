@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as crypto from 'crypto';
 import { format } from 'date-fns';
-import { payment_status_enum } from '@prisma/client';
+import { payment_status_enum, subscription_status_enum } from '@prisma/client';
 import { EligibilityResponse } from './dto/payment-response.dto';
 
 @Injectable()
@@ -18,7 +18,9 @@ export class PaymentsService {
   async checkEligibility(
     userId: string,
     packageId: string,
-  ): Promise<EligibilityResponse> {
+    comboId: string,
+    skinAnalysisId: string,
+  ): Promise<EligibilityResponse & { action: string }> {
     const now = new Date();
 
     const targetPackage = await this.prisma.routine_packages.findUnique({
@@ -29,19 +31,11 @@ export class PaymentsService {
       throw new NotFoundException('Package not found');
     }
 
-    const hasEverHadActiveSubscription =
-      await this.prisma.user_package_subscriptions.findFirst({
-        where: {
-          user_id: userId,
-          is_active: true,
-        },
-      });
-
     const currentActiveSub =
       await this.prisma.user_package_subscriptions.findFirst({
         where: {
           user_id: userId,
-          is_active: true,
+          status: subscription_status_enum.ACTIVE,
           end_date: { gt: now },
         },
         include: {
@@ -49,8 +43,88 @@ export class PaymentsService {
         },
       });
 
+    if (currentActiveSub && currentActiveSub.routine_package_id === packageId) {
+      const isSameCombo = currentActiveSub.selected_combo_id === comboId;
+
+      const totalScanLimit = currentActiveSub.routine_package.total_scan_limit;
+
+      const totalRoutinePairs = totalScanLimit * 4;
+
+      const routinePairsPerScan = Math.floor(
+        totalRoutinePairs / totalScanLimit,
+      );
+
+      const routinesOfThisScan = await this.prisma.user_routines.count({
+        where: {
+          user_package_subscription_id: currentActiveSub.id,
+          skin_analysis_id: skinAnalysisId,
+        },
+      });
+
+      const createdPairsOfThisScan = routinesOfThisScan / 2;
+
+      if (createdPairsOfThisScan >= routinePairsPerScan) {
+        return {
+          requiresPayment: true,
+          isFreeTrial: false,
+          hasActivePackage: true,
+          action: 'LIMIT_REACHED',
+          currentPackage: {
+            name: currentActiveSub.routine_package.package_name,
+            endDate: currentActiveSub.end_date,
+          },
+        };
+      }
+
+      if (isSameCombo) {
+        return {
+          requiresPayment: false,
+          isFreeTrial: false,
+          hasActivePackage: true,
+          action: 'REUSE',
+          currentPackage: {
+            name: currentActiveSub.routine_package.package_name,
+            endDate: currentActiveSub.end_date,
+          },
+        };
+      }
+
+      const isFreeTrialPackage =
+        currentActiveSub.routine_package.duration_days <= 7 &&
+        currentActiveSub.routine_package.price.eq(0);
+
+      if (isFreeTrialPackage) {
+        return {
+          requiresPayment: false,
+          isFreeTrial: false,
+          hasActivePackage: true,
+          action: 'CREATE_NEW',
+          currentPackage: {
+            name: currentActiveSub.routine_package.package_name,
+            endDate: currentActiveSub.end_date,
+          },
+        };
+      }
+
+      return {
+        requiresPayment: false,
+        isFreeTrial: false,
+        hasActivePackage: true,
+        action: 'CONFIRM_CHANGE_COMBO',
+        currentPackage: {
+          name: currentActiveSub.routine_package.package_name,
+          endDate: currentActiveSub.end_date,
+        },
+      };
+    }
+
+    const hasEverSubscribed =
+      await this.prisma.user_package_subscriptions.findFirst({
+        where: { user_id: userId },
+      });
+
     const isEligibleForFreeTrial =
-      targetPackage.duration_days <= 7 && !hasEverHadActiveSubscription;
+      targetPackage.duration_days <= 7 && !hasEverSubscribed;
 
     if (!currentActiveSub) {
       return {
@@ -59,6 +133,7 @@ export class PaymentsService {
           : targetPackage.price.gt(0),
         isFreeTrial: isEligibleForFreeTrial,
         hasActivePackage: false,
+        action: isEligibleForFreeTrial ? 'CREATE_NEW' : 'REQUIRE_PAYMENT',
         currentPackage: null,
       };
     }
@@ -67,6 +142,7 @@ export class PaymentsService {
       requiresPayment: targetPackage.price.gt(0),
       isFreeTrial: false,
       hasActivePackage: true,
+      action: 'REQUIRE_PAYMENT',
       currentPackage: {
         name: currentActiveSub.routine_package.package_name,
         endDate: currentActiveSub.end_date,
@@ -86,14 +162,17 @@ export class PaymentsService {
 
     if (!pkg) throw new NotFoundException('Package not found');
 
+    const now = new Date();
+    const nowUtc = new Date(now.toISOString());
+
     const subscription = await this.prisma.user_package_subscriptions.create({
       data: {
         user_id: userId,
         routine_package_id: packageId,
         selected_combo_id: comboId,
-        start_date: new Date(),
-        end_date: new Date(),
-        is_active: false,
+        start_date: nowUtc,
+        end_date: nowUtc,
+        status: subscription_status_enum.PENDING,
       },
     });
 
@@ -116,28 +195,35 @@ export class PaymentsService {
 
     if (!pkg) throw new NotFoundException('Package not found');
 
-    const startDate = new Date();
+    const now = new Date();
+    const startDate = new Date(now.toISOString());
+    const endDate = new Date(
+      startDate.getTime() + pkg.duration_days * 24 * 60 * 60 * 1000,
+    );
 
-    const endDate = new Date();
-    endDate.setDate(startDate.getDate() + pkg.duration_days);
+    return this.prisma.$transaction(async (tx) => {
+      const subscription = await tx.user_package_subscriptions.create({
+        data: {
+          user_id: userId,
+          routine_package_id: packageId,
+          selected_combo_id: comboId,
+          start_date: startDate,
+          end_date: endDate,
+          status: subscription_status_enum.ACTIVE,
+        },
+      });
 
-    await this.prisma.user_package_subscriptions.updateMany({
-      where: {
-        user_id: userId,
-        is_active: true,
-      },
-      data: { is_active: false },
-    });
+      await tx.payments.create({
+        data: {
+          user_id: userId,
+          subscription_id: subscription.id,
+          amount: 0,
+          vnp_OrderInfo: `Free Trial: ${pkg.package_name}`,
+          status: payment_status_enum.SUCCESS,
+        },
+      });
 
-    return this.prisma.user_package_subscriptions.create({
-      data: {
-        user_id: userId,
-        routine_package_id: packageId,
-        selected_combo_id: comboId,
-        start_date: startDate,
-        end_date: endDate,
-        is_active: true,
-      },
+      return subscription;
     });
   }
 
@@ -153,8 +239,10 @@ export class PaymentsService {
 
     const sortedParams = this.sortObject(data);
     const signData = this.buildQueryString(sortedParams);
-    const hmac = crypto.createHmac('sha512', secretKey);
-    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+    const signed = crypto
+      .createHmac('sha512', secretKey)
+      .update(Buffer.from(signData, 'utf-8'))
+      .digest('hex');
 
     if (secureHash !== signed) {
       this.logger.error('Invalid VNPAY signature');
@@ -167,10 +255,16 @@ export class PaymentsService {
 
     const payment = await this.prisma.payments.findUnique({
       where: { id: orderId },
-      include: { subscription: { include: { routine_package: true } } },
+      include: {
+        subscription: {
+          include: { routine_package: true },
+        },
+      },
     });
 
     if (!payment) return { RspCode: '01', Message: 'Order not found' };
+    if (!payment.subscription)
+      return { RspCode: '01', Message: 'Subscription not found' };
 
     const expectedAmount = Math.floor(Number(payment.amount) * 100).toString();
     if (expectedAmount !== vnpAmount.toString())
@@ -179,47 +273,62 @@ export class PaymentsService {
     if (payment.status !== payment_status_enum.PENDING)
       return { RspCode: '02', Message: 'Order already processed' };
 
-    if (responseCode === '00') {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.payments.update({
-          where: { id: orderId },
-          data: { status: payment_status_enum.SUCCESS },
-        });
-
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setDate(
-          startDate.getDate() +
-            payment.subscription.routine_package.duration_days,
-        );
-
-        await tx.user_package_subscriptions.updateMany({
-          where: {
-            user_id: payment.user_id,
-            is_active: true,
-          },
-          data: {
-            is_active: false,
-          },
-        });
-
-        await tx.user_package_subscriptions.update({
-          where: { id: payment.subscription_id },
-          data: {
-            start_date: startDate,
-            end_date: endDate,
-            is_active: true,
-          },
-        });
-      });
-      return { RspCode: '00', Message: 'Success' };
-    } else {
+    if (responseCode !== '00') {
       await this.prisma.payments.update({
         where: { id: orderId },
         data: { status: payment_status_enum.FAILED },
       });
       return { RspCode: '00', Message: 'Success' };
     }
+
+    await this.prisma.$transaction(async (tx) => {
+      const currentPayment = await tx.payments.findUnique({
+        where: { id: orderId },
+      });
+
+      if (
+        !currentPayment ||
+        currentPayment.status !== payment_status_enum.PENDING
+      ) {
+        return;
+      }
+
+      await tx.payments.update({
+        where: { id: orderId },
+        data: { status: payment_status_enum.SUCCESS },
+      });
+
+      const now = new Date();
+      const startDate = new Date(now.toISOString());
+
+      const durationDays = payment.subscription.routine_package.duration_days;
+
+      const endDate = new Date(
+        startDate.getTime() + durationDays * 24 * 60 * 60 * 1000,
+      );
+
+      await tx.user_package_subscriptions.updateMany({
+        where: {
+          user_id: payment.user_id,
+          status: subscription_status_enum.ACTIVE,
+          id: { not: payment.subscription_id },
+        },
+        data: {
+          status: subscription_status_enum.CANCELED,
+        },
+      });
+
+      await tx.user_package_subscriptions.update({
+        where: { id: payment.subscription_id },
+        data: {
+          start_date: startDate,
+          end_date: endDate,
+          status: subscription_status_enum.ACTIVE,
+        },
+      });
+    });
+
+    return { RspCode: '00', Message: 'Success' };
   }
 
   private async generateVnpayUrl(

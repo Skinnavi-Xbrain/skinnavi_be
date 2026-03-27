@@ -20,6 +20,7 @@ export class CombosService {
                 name: true,
                 image_url: true,
                 display_price: true,
+                affiliate_url: true,
                 usage_role: true,
               },
             },

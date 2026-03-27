@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { GoogleGenAI } from '@google/genai';
 import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
+import { subscription_status_enum } from '@prisma/client';
+import { Order } from '@Constant/index';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
@@ -28,6 +30,7 @@ export class RoutinesService {
     contentParams: any,
   ) {
     let attempts = 0;
+
     while (attempts < this.apiKeyManager.totalKeys) {
       const apiKey = this.apiKeyManager.getCurrentKey();
 
@@ -41,19 +44,36 @@ export class RoutinesService {
           contents: contentParams,
         });
       } catch (error: any) {
+        const status = error?.status;
+        const message = error?.message?.toLowerCase() || '';
+
         if (
-          error?.status === 429 ||
-          error?.message?.includes('429') ||
-          error?.message?.toLowerCase().includes('quota')
+          status === 429 ||
+          message.includes('429') ||
+          message.includes('quota')
         ) {
+          this.logger.warn(`API key quota exceeded. Switching key...`);
           this.apiKeyManager.getNextKey();
           attempts++;
-        } else {
-          throw error;
+          continue;
         }
+
+        if (status === 503 || message.includes('high demand')) {
+          const delay = (attempts + 1) * 2000;
+          this.logger.warn(`Model overloaded. Retrying in ${delay}ms`);
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          attempts++;
+          continue;
+        }
+
+        throw error;
       }
     }
-    throw new BadRequestException('All API keys exhausted');
+
+    throw new BadRequestException(
+      'All API keys exhausted or service unavailable',
+    );
   }
 
   async createRoutine(params: {
@@ -87,32 +107,19 @@ export class RoutinesService {
         where: {
           user_id: userId,
           routine_package_id: routinePackageId,
-          selected_combo_id: comboId,
-          is_active: true,
+          status: subscription_status_enum.ACTIVE,
           end_date: { gt: new Date() },
         },
         include: {
           routine_package: true,
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: Order.DESC },
       },
     );
 
     if (!subscription) {
       throw new BadRequestException(
         'No active subscription found. Please subscribe to the package first.',
-      );
-    }
-
-    const existingRoutine = await this.prisma.user_routines.findFirst({
-      where: {
-        user_package_subscription_id: subscription.id,
-      },
-    });
-
-    if (existingRoutine && !subscription.routine_package.allow_tracking) {
-      throw new BadRequestException(
-        'Your package allows routine creation only once. Please upgrade to track progress.',
       );
     }
 
@@ -164,16 +171,13 @@ export class RoutinesService {
 
     const raw =
       (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!raw) throw new BadRequestException('AI did not return JSON');
 
     const cleaned = raw
       .replace(/^```json\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
-
     let parsed: any;
-
     try {
       parsed = JSON.parse(cleaned);
     } catch {
@@ -187,13 +191,12 @@ export class RoutinesService {
         data: {
           user_package_subscription_id: subscription.id,
           routine_time: time,
+          skin_analysis_id: skinAnalysisId,
         },
       });
 
       for (const step of steps) {
-        if (!validProductIds.includes(step.productId)) {
-          throw new BadRequestException(`Invalid productId: ${step.productId}`);
-        }
+        if (!validProductIds.includes(step.productId)) continue;
 
         const productInfo = combo.combo_products.find(
           (cp) => cp.product.id === step.productId,
@@ -212,9 +215,7 @@ export class RoutinesService {
           const template =
             await this.prisma.product_usage_instructions.findUnique({
               where: { usage_role: productInfo.usage_role },
-              include: {
-                sub_steps: { orderBy: { step_order: 'asc' } },
-              },
+              include: { sub_steps: { orderBy: { step_order: Order.ASC } } },
             });
 
           if (template?.sub_steps?.length) {
@@ -250,12 +251,12 @@ export class RoutinesService {
       include: {
         steps: {
           include: { product: true, sub_steps: true },
-          orderBy: { step_order: 'asc' },
+          orderBy: { step_order: Order.ASC },
         },
         subscription: true,
       },
       orderBy: {
-        created_at: 'desc',
+        created_at: Order.DESC,
       },
     });
   }
@@ -270,11 +271,11 @@ export class RoutinesService {
         include: {
           steps: {
             include: { product: true, sub_steps: true },
-            orderBy: { step_order: 'asc' },
+            orderBy: { step_order: Order.ASC },
           },
         },
         orderBy: {
-          created_at: 'desc',
+          created_at: Order.DESC,
         },
       }),
       this.prisma.user_routines.findFirst({
@@ -285,11 +286,11 @@ export class RoutinesService {
         include: {
           steps: {
             include: { product: true, sub_steps: true },
-            orderBy: { step_order: 'asc' },
+            orderBy: { step_order: Order.ASC },
           },
         },
         orderBy: {
-          created_at: 'desc',
+          created_at: Order.DESC,
         },
       }),
     ]);
@@ -310,86 +311,5 @@ export class RoutinesService {
       throw new NotFoundException('Routine step not found');
     }
     return step;
-  }
-
-  async getUserSkinAnalyses(userId: string, days: number = 7) {
-    const user = await this.prisma.users.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    const start = new Date(end);
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-
-    const skinAnalyses = await this.prisma.skin_analyses.findMany({
-      where: {
-        user_id: userId,
-        created_at: { gte: start },
-      },
-      include: {
-        skin_type: true,
-        metrics: true,
-      },
-      orderBy: { created_at: 'desc' },
-    });
-
-    if (skinAnalyses.length < 2) {
-      return {
-        user_id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-        avatar_url: user.avatar_url,
-        skin_analyses: [],
-        start_date: start.toISOString().split('T')[0],
-        end_date: end.toISOString().split('T')[0],
-        message: `At least 2 analyses are required between ${
-          start.toISOString().split('T')[0]
-        } and ${end.toISOString().split('T')[0]}`,
-      };
-    }
-
-    const analyzesWithTrend: any[] = [];
-    for (let i = 0; i < skinAnalyses.length; i++) {
-      const current = skinAnalyses[i];
-      const previous = skinAnalyses[i + 1];
-
-      let scoreTrend: number | null = null;
-      if (current.overall_score && previous?.overall_score) {
-        scoreTrend =
-          Number(current.overall_score) - Number(previous.overall_score);
-      }
-
-      analyzesWithTrend.push({
-        id: current.id,
-        skin_type_code: current.skin_type.code,
-        overall_score: current.overall_score
-          ? Number(current.overall_score)
-          : null,
-        overall_comment: current.overall_comment,
-        created_at: current.created_at.toISOString(),
-        face_image_url: current.face_image_url,
-        overall_score_trend: scoreTrend,
-        metrics: current.metrics.map((m) => ({
-          metric_type: m.metric_type,
-          score: m.score ? Number(m.score) : null,
-        })),
-      });
-    }
-
-    return {
-      user_id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      avatar_url: user.avatar_url,
-      start_date: start.toISOString().split('T')[0],
-      end_date: end.toISOString().split('T')[0],
-      skin_analyses: analyzesWithTrend,
-    };
   }
 }
