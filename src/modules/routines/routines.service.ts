@@ -207,7 +207,9 @@ export class RoutinesService {
     return await this.prisma.$transaction(async (tx) => {
       await tx.user_routines.updateMany({
         where: {
-          user_package_subscription_id: subscription.id,
+          subscription: {
+            user_id: userId,
+          },
           is_active: true,
         },
         data: { is_active: false },
