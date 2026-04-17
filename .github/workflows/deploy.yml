@@ -29,6 +29,15 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
         id: login-ecr
 
+      - name: Ensure ECR repo exists
+        run: |
+          aws ecr describe-repositories \
+            --repository-names ${{ secrets.ECR_REPOSITORY }} \
+            --region ${{ secrets.AWS_REGION }} || \
+          aws ecr create-repository \
+            --repository-name ${{ secrets.ECR_REPOSITORY }} \
+            --region ${{ secrets.AWS_REGION }}
+
       - name: Build & Push Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -43,7 +52,8 @@ jobs:
           # Get current task definition
           TASK_DEF=$(aws ecs describe-task-definition \
             --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
-            --query taskDefinition)
+            --query taskDefinition \
+            --region ${{ secrets.AWS_REGION }})
 
           # Replace image with the new one dynamically by container name
           NEW_TASK_DEF=$(echo $TASK_DEF | jq \
@@ -61,7 +71,9 @@ jobs:
 
       - name: Register new task definition
         run: |
-          NEW_TASK_INFO=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json)
+          NEW_TASK_INFO=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --region ${{ secrets.AWS_REGION }})
           NEW_REVISION=$(echo $NEW_TASK_INFO | jq -r '.taskDefinition.revision')
           echo "NEW_TASK_REVISION=$NEW_REVISION" >> $GITHUB_ENV
 
@@ -71,10 +83,12 @@ jobs:
             --cluster ${{ secrets.ECS_CLUSTER }} \
             --service ${{ secrets.ECS_SERVICE }} \
             --task-definition ${{ secrets.ECS_TASK_DEFINITION }}:${{ env.NEW_TASK_REVISION }} \
-            --force-new-deployment
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Wait for service stable
         run: |
           aws ecs wait services-stable \
             --cluster ${{ secrets.ECS_CLUSTER }} \
-            --services ${{ secrets.ECS_SERVICE }}
+            --services ${{ secrets.ECS_SERVICE }} \
+            --region ${{ secrets.AWS_REGION }}
