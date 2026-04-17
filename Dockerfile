@@ -16,6 +16,9 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Generate Prisma Client (Required for TS build)
+RUN npx prisma generate
+
 # Build the NestJS application
 RUN npm run build
 
