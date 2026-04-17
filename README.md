@@ -132,6 +132,7 @@ npm run db:reset:seed   # Reset DB + seed it again from scratch
 - 📌 **New:** `GET /routines/steps/:id` returns a step with its product and an array of sub‑steps (title, howTo, 4 image URLs) for detailed view.
 
 ---
+@thydynh@
 
 <div align="center">
 
