@@ -28,8 +28,9 @@ FROM node:20-alpine AS production
 # Set working directory
 WORKDIR /app
 
-# Set environment variable to run in production mode
+# Set environment variables
 ENV NODE_ENV=production
+ENV PORT=5000
 
 # Install openssl for Prisma in the runtime container
 RUN apk add --no-cache openssl
