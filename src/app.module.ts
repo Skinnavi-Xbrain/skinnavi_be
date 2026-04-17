@@ -15,11 +15,13 @@ import { TrackingModule } from './modules/tracking/tracking.module';
 import { AdminModule } from './admin/admin.module';
 import { PackageSubscriptionsModule } from './modules/package-subscriptions/package-subscriptions.module';
 import { UserModule } from './modules/profile-user/user.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    HealthModule,
     AuthModule,
     ProductsModule,
     CombosModule,

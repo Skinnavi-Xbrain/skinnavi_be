@@ -1,35 +1,67 @@
-// @ts-check
-import eslint from '@eslint/js';
-import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
-export default tseslint.config(
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { defineConfig } from 'eslint/config';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export default defineConfig(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      'generated/**',
+      'prisma/generated/**',
+      '*.config.js',
+      '.*.js',
+      'coverage/**',
+      '.package-lock.json',
+    ],
   },
-  eslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
-  eslintPluginPrettierRecommended,
+
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+
   {
+    files: ['**/*.ts', '**/*.js'],
+
     languageOptions: {
+      ecmaVersion: 2020,
       globals: {
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: __dirname,
       },
     },
-  },
-  {
+
     rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+
+      'no-console': 'warn',
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      '@typescript-eslint/no-unsafe-function-type': 'error',
+      'prefer-const': 'error',
+
+      eqeqeq: 'off',
+      curly: ['error', 'all'],
     },
   },
+  eslintConfigPrettier,
 );

@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.github
+
+# Node & Package Managers
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build Outputs
+dist
+coverage
+build
+.next
+Out
+.tscache
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Development configs
+.husky
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Linter & Formatting
+.prettierrc
+.prettierignore
+eslint.config.js
+eslint.config.mjs
+commitlint.config.js
+
+# Test
+test/
+
+# Markdown/Docs
+README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
