@@ -1,43 +1,80 @@
-name: Deploy to Render
+name: Deploy Backend to AWS ECS
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
+    branches: ["main"]
 
 jobs:
-  deploy_development:
-    name: Deploy Development (dev)
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'dev'
+  deploy:
     runs-on: ubuntu-latest
-    environment: development
-    concurrency:
-      group: render-development
-      cancel-in-progress: true
 
     steps:
-      - name: Trigger Render development deploy hook
-        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL_DEV"
-        env:
-          RENDER_DEPLOY_HOOK_URL_DEV: ${{ secrets.RENDER_DEPLOY_HOOK_URL_DEV }}
+      - uses: actions/checkout@v4
 
-  deploy_production:
-    name: Deploy Production (main)
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
-    runs-on: ubuntu-latest
-    environment: production
-    concurrency:
-      group: render-production
-      cancel-in-progress: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
 
-    steps:
-      - name: Trigger Render production deploy hook
-        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL_PROD"
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
+      - name: Build & Push Image
         env:
-          RENDER_DEPLOY_HOOK_URL_PROD: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PROD }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ secrets.ECR_REPOSITORY }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPO:$TAG .
+          docker push $REGISTRY/$REPO:$TAG
+
+      - name: Update ECS Task Definition
+        run: |
+          # Get current task definition
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+            --query taskDefinition)
+
+          # Replace image with the new one dynamically by container name
+          NEW_TASK_DEF=$(echo $TASK_DEF | jq \
+            --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}" \
+            --arg CONTAINER_NAME "skinnavi-backend" \
+            '.containerDefinitions |= map(if .name == $CONTAINER_NAME then .image = $IMAGE else . end)')
+
+          # Remove properties that cannot be included when registering a new task definition
+          CLEANED_TASK_DEF=$(echo $NEW_TASK_DEF | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+
+          echo "$CLEANED_TASK_DEF" > new-task-def.json
+
+      - name: Print new task def
+        run: cat new-task-def.json
+
+      - name: Register new task definition
+        run: |
+          NEW_TASK_INFO=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json)
+          NEW_REVISION=$(echo $NEW_TASK_INFO | jq -r '.taskDefinition.revision')
+          echo "NEW_TASK_REVISION=$NEW_REVISION" >> $GITHUB_ENV
+
+      - name: Deploy
+        run: |
+          aws ecs update-service \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE }} \
+            --task-definition ${{ secrets.ECS_TASK_DEFINITION }}:${{ env.NEW_TASK_REVISION }} \
+            --force-new-deployment
+
+      - name: Wait for service stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE }}
