@@ -40,9 +40,23 @@ export class ChatRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ChatMessageDto)
   history?: ChatMessageDto[];
+
+  @ApiProperty({
+    description: 'Session ID for AWS Bedrock Knowledge Base RAG',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  sessionId?: string;
 }
 
 export class ChatResponseDto {
   @ApiProperty({ description: 'The AI assistant reply' })
   reply: string;
+
+  @ApiProperty({
+    description: 'Session ID returned from AWS Bedrock Knowledge Base RAG',
+    required: false,
+  })
+  sessionId?: string;
 }
