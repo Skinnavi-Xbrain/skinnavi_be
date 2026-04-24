@@ -6,8 +6,8 @@ on:
 
 env:
   AWS_REGION: us-west-2
-  ECS_CLUSTER: skinnavi-cluster
-  ECS_SERVICE: be-fargate-task-service-1vinljep
+  ECS_CLUSTER: group15-be-fargate-cluster
+  ECS_SERVICE: be-fargate-task-service-y9g0944e
   ECS_TASK_DEFINITION: be-fargate-task
   CONTAINER_NAME: skinnavi-backend
 
