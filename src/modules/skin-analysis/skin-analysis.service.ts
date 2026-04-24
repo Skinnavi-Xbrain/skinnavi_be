@@ -4,7 +4,6 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { GoogleGenAI, createUserContent } from '@google/genai';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   Prisma,
@@ -13,10 +12,8 @@ import {
 } from '@prisma/client';
 import crypto from 'crypto';
 import { AIAnalysisResult, analysisResultSchema } from './skin-analysis.schema';
-import { ApiKeyManagerService } from '../../common/aipKeyManager/api-key-manager.service';
+import { BedrockService } from '../../common/bedrock/bedrock.service';
 import { Order } from '@Constant/index';
-
-const GEMINI_MODEL = 'gemini-2.5-flash';
 
 @Injectable()
 export class SkinAnalysisService {
@@ -24,7 +21,7 @@ export class SkinAnalysisService {
 
   constructor(
     private prisma: PrismaService,
-    private apiKeyManager: ApiKeyManagerService,
+    private bedrockService: BedrockService,
   ) {}
 
   async checkAnalysisLimit(userId: string) {
@@ -92,60 +89,6 @@ export class SkinAnalysisService {
       used: totalAnalysesInCurrentSub,
       limit: limit,
     });
-  }
-
-  private async generateContentWithRetry(modelName: string, params: any) {
-    let attempts = 0;
-    const maxAttempts = this.apiKeyManager.totalKeys * 2;
-
-    while (attempts < maxAttempts) {
-      const apiKey = this.apiKeyManager.getCurrentKey();
-
-      const ai = new GoogleGenAI({
-        apiKey,
-      });
-
-      try {
-        return await ai.models.generateContent({
-          model: modelName,
-          ...params,
-        });
-      } catch (error: any) {
-        const status = error?.status;
-        const message = error?.message?.toLowerCase() || '';
-
-        if (
-          status === 429 ||
-          message.includes('429') ||
-          message.includes('quota')
-        ) {
-          this.logger.warn(`API key quota exceeded. Switching to next key...`);
-
-          this.apiKeyManager.getNextKey();
-          attempts++;
-          continue;
-        }
-
-        if (status === 503 || message.includes('high demand')) {
-          const delay = Math.min((attempts + 1) * 2000, 10000);
-
-          this.logger.warn(
-            `Gemini model overloaded. Retrying in ${delay}ms...`,
-          );
-
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          attempts++;
-          continue;
-        }
-
-        this.logger.error(`AI Generation error: ${error.message}`);
-        throw error;
-      }
-    }
-
-    throw new BadRequestException(
-      'Gemini AI service unavailable or all API keys exhausted.',
-    );
   }
 
   async analyzeImage(imageUrl: string, userId: string) {
@@ -232,23 +175,13 @@ export class SkinAnalysisService {
       previousAnalysisText,
     );
 
-    const aiRes = await this.generateContentWithRetry(GEMINI_MODEL, {
-      contents: createUserContent([
-        { inlineData: { mimeType, data: imageBase64 } },
-        prompt,
-      ]),
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1,
-        topP: 0.3,
-        topK: 20,
-      },
+    // ── Bedrock / Claude call (replaces Gemini) ──────────────────────
+    const aiResponseText = await this.bedrockService.invokeModel(prompt, {
+      base64: imageBase64,
+      mimeType,
     });
 
-    const text = aiRes.text ?? aiRes.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new BadRequestException('AI returned empty');
-
-    const result = this.parseAIResponse(text);
+    const result = this.parseAIResponse(aiResponseText);
     result.imageUrl = imageUrl;
 
     if (!result.isValidImage) {

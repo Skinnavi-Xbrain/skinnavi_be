@@ -4,91 +4,168 @@ on:
   push:
     branches: ["main"]
 
+env:
+  AWS_REGION: us-west-2
+  ECS_CLUSTER: group15-be-fargate-cluster
+  ECS_SERVICE: be-fargate-task-service-y9g0944e
+  ECS_TASK_DEFINITION: be-fargate-task
+  CONTAINER_NAME: skinnavi-backend
+
 jobs:
-  deploy:
+  # ── CI: Lint, Typecheck, Build ─────────────────────────────────────
+  ci:
+    name: CI Quality Check
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: skinnavi_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d skinnavi_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/skinnavi_db?schema=public
+      NODE_ENV: test
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
+      - name: Install dependencies
+        run: npm ci
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  # ── Deploy: Build image → Push ECR → Update ECS ───────────────────
+  deploy:
+    name: Deploy to ECS Fargate
+    needs: ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
         id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Ensure ECR repo exists
+      - name: Ensure ECR repository exists
         run: |
           aws ecr describe-repositories \
             --repository-names ${{ secrets.ECR_REPOSITORY }} \
-            --region ${{ secrets.AWS_REGION }} || \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || \
           aws ecr create-repository \
             --repository-name ${{ secrets.ECR_REPOSITORY }} \
-            --region ${{ secrets.AWS_REGION }}
+            --region ${{ env.AWS_REGION }}
 
-      - name: Build & Push Image
+      - name: Build & push Docker image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPO: ${{ secrets.ECR_REPOSITORY }}
           TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$REPO:$TAG .
+          docker build -t $REGISTRY/$REPO:$TAG -t $REGISTRY/$REPO:latest .
           docker push $REGISTRY/$REPO:$TAG
+          docker push $REGISTRY/$REPO:latest
 
-      - name: Update ECS Task Definition
+      - name: Setup Node for Prisma migrate
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Run Prisma migrate on production RDS
+        env:
+          DATABASE_URL: postgresql://${{ secrets.DB_USERNAME }}:${{ secrets.DB_PASSWORD }}@skinnavi-rds.cjy0ckgcird1.us-west-2.rds.amazonaws.com:5432/skinnavi_db?schema=public
         run: |
-          # Get current task definition
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+          npm ci --ignore-scripts
+          npx prisma generate
+          echo "🗄️ Running Prisma migrate deploy on production RDS..."
+          npx prisma migrate deploy
+          echo "✅ Database migration complete!"
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
             --query taskDefinition \
-            --region ${{ secrets.AWS_REGION }})
+            --region ${{ env.AWS_REGION }} \
+            --output json > task-def.json
 
-          # Replace image with the new one dynamically by container name
-          NEW_TASK_DEF=$(echo $TASK_DEF | jq \
-            --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}" \
-            --arg CONTAINER_NAME "skinnavi-backend" \
-            '.containerDefinitions |= map(if .name == $CONTAINER_NAME then .image = $IMAGE else . end)')
+      - name: Update image in task definition
+        run: |
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}"
 
-          # Remove properties that cannot be included when registering a new task definition
-          CLEANED_TASK_DEF=$(echo $NEW_TASK_DEF | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
+          # Update container image
+          jq --arg IMG "$IMAGE" --arg CN "${{ env.CONTAINER_NAME }}" \
+            '.containerDefinitions |= map(if .name == $CN then .image = $IMG else . end)' \
+            task-def.json > tmp.json
 
-          echo "$CLEANED_TASK_DEF" > new-task-def.json
+          # Remove read-only fields before registering
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            tmp.json > new-task-def.json
 
-      - name: Print new task def
-        run: cat new-task-def.json
+          echo "── New task definition ──"
+          cat new-task-def.json
 
       - name: Register new task definition
+        id: register-task
         run: |
-          NEW_TASK_INFO=$(aws ecs register-task-definition \
+          RESULT=$(aws ecs register-task-definition \
             --cli-input-json file://new-task-def.json \
-            --region ${{ secrets.AWS_REGION }})
-          NEW_REVISION=$(echo $NEW_TASK_INFO | jq -r '.taskDefinition.revision')
-          echo "NEW_TASK_REVISION=$NEW_REVISION" >> $GITHUB_ENV
+            --region ${{ env.AWS_REGION }})
+          REVISION=$(echo $RESULT | jq -r '.taskDefinition.revision')
+          echo "revision=$REVISION" >> $GITHUB_OUTPUT
+          echo "✅ Registered ${{ env.ECS_TASK_DEFINITION }}:$REVISION"
 
-      - name: Deploy
+      - name: Deploy to ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ secrets.ECS_CLUSTER }} \
-            --service ${{ secrets.ECS_SERVICE }} \
-            --task-definition ${{ secrets.ECS_TASK_DEFINITION }}:${{ env.NEW_TASK_REVISION }} \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }}:${{ steps.register-task.outputs.revision }} \
             --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
+            --region ${{ env.AWS_REGION }}
+          echo "🚀 Deploying ${{ env.ECS_TASK_DEFINITION }}:${{ steps.register-task.outputs.revision }}"
 
-      - name: Wait for service stable
+      - name: Wait for service stability
         run: |
+          echo "⏳ Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
-            --cluster ${{ secrets.ECS_CLUSTER }} \
-            --services ${{ secrets.ECS_SERVICE }} \
-            --region ${{ secrets.AWS_REGION }}
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Service is stable!"
