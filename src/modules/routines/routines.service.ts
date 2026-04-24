@@ -5,76 +5,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { GoogleGenAI } from '@google/genai';
-import { ApiKeyManagerService } from 'src/common/aipKeyManager/api-key-manager.service';
+import { BedrockService } from '../../common/bedrock/bedrock.service';
 import { routine_time_enum, subscription_status_enum } from '@prisma/client';
 import { Order } from '@Constant/index';
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
-
 @Injectable()
 export class RoutinesService {
-  private ai: GoogleGenAI;
   private readonly logger = new Logger(RoutinesService.name);
 
   constructor(
     private prisma: PrismaService,
-    private apiKeyManager: ApiKeyManagerService,
-  ) {
-    const apiKey = this.apiKeyManager.getCurrentKey();
-    this.ai = new GoogleGenAI({ apiKey });
-  }
-
-  private async generateContentWithRetry(
-    modelName: string,
-    contentParams: any,
-  ) {
-    let attempts = 0;
-
-    while (attempts < this.apiKeyManager.totalKeys) {
-      const apiKey = this.apiKeyManager.getCurrentKey();
-
-      const ai = new GoogleGenAI({
-        apiKey: apiKey,
-      });
-
-      try {
-        return await ai.models.generateContent({
-          model: modelName,
-          contents: contentParams,
-        });
-      } catch (error: any) {
-        const status = error?.status;
-        const message = error?.message?.toLowerCase() || '';
-
-        if (
-          status === 429 ||
-          message.includes('429') ||
-          message.includes('quota')
-        ) {
-          this.logger.warn(`API key quota exceeded. Switching key...`);
-          this.apiKeyManager.getNextKey();
-          attempts++;
-          continue;
-        }
-
-        if (status === 503 || message.includes('high demand')) {
-          const delay = (attempts + 1) * 2000;
-          this.logger.warn(`Model overloaded. Retrying in ${delay}ms`);
-
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          attempts++;
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw new BadRequestException(
-      'All API keys exhausted or service unavailable',
-    );
-  }
+    private bedrockService: BedrockService,
+  ) {}
 
   private toVNTime(date: Date): Date {
     return new Date(date.getTime() + 7 * 60 * 60 * 1000);
@@ -182,13 +124,8 @@ export class RoutinesService {
     - No markdown, no explanation.
     `;
 
-    const res = await this.generateContentWithRetry(GEMINI_MODEL, [
-      { role: 'user', parts: [{ text: prompt }] },
-    ]);
-
-    const raw =
-      (res as any).text ?? res.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!raw) throw new BadRequestException('AI did not return JSON');
+    // ── Bedrock / Claude call (replaces Gemini) ──────────────────────
+    const raw = await this.bedrockService.invokeModel(prompt);
 
     const cleaned = raw
       .replace(/^```json\s*/i, '')
