@@ -1,0 +1,28 @@
+# TỔNG QUAN DỰ ÁN SKINNAVI (SKINNAVI PROJECT OVERVIEW)
+
+Tài liệu này cung cấp thông tin tổng quan về dự án SkinNavi, kiến trúc hệ thống và các tính năng chính. Tài liệu được sử dụng làm dữ liệu đầu vào (output) cho AWS Bedrock Knowledge Base để AI Assistant có thể hiểu và trả lời các câu hỏi liên quan đến chính nền tảng SkinNavi.
+
+## 1. SkinNavi Là Gì?
+SkinNavi là một ứng dụng trợ lý chăm sóc da (Skincare Assistant) thông minh, tích hợp trí tuệ nhân tạo (AI) để giúp người dùng phân tích tình trạng da, theo dõi chu trình dưỡng da (routine) và nhận tư vấn cá nhân hóa.
+
+## 2. Các Tính Năng Chính (Core Features)
+- **AI Skin Analysis (Phân tích da bằng AI)**: Người dùng chụp ảnh khuôn mặt, hệ thống sẽ sử dụng AI (AWS Bedrock - Claude Haiku 4.5) để phân tích 4 chỉ số chính: PORES (Lỗ chân lông), ACNE (Mụn), DARK_CIRCLES (Quầng thâm mắt), và DARK_SPOTS (Đốm nâu/Nám). Điểm số từ 0-100.
+- **Personalized Routine (Chu trình cá nhân hóa)**: Dựa trên kết quả phân tích, SkinNavi tự động tạo chu trình chăm sóc da buổi sáng (AM) và buổi tối (PM) phù hợp với từng loại da.
+- **Routine Tracking (Theo dõi tiến trình)**: Cho phép người dùng check-list các bước dưỡng da mỗi ngày và xem biểu đồ cải thiện tình trạng da qua các lần scan.
+- **AI Chatbot**: Trợ lý ảo (SkinNavi Assistant) tích hợp ngay trên trang chủ để giải đáp thắc mắc về da liễu, hoạt chất mỹ phẩm và hướng dẫn sử dụng sản phẩm.
+- **Subscription & Payment**: Tích hợp cổng thanh toán VNPay. Cung cấp gói Basic (giới hạn lượt scan) và gói Premium (scan không giới hạn, tracking nâng cao).
+
+## 3. Kiến Trúc Kỹ Thuật (Technical Architecture)
+- **Frontend (skinnavi_fe)**: Giao diện người dùng thân thiện, tương tác thời gian thực.
+- **Backend (skinnavi_be)**: Hệ thống API xây dựng với Node.js, sử dụng Prisma ORM.
+- **Database**: PostgreSQL lưu trữ trên AWS RDS (skinnavi-rds).
+- **AI Engine**: AWS Bedrock (sử dụng model Claude 3.5 Haiku) cho Chatbot và phân tích da.
+- **Infrastructure & Deployment**:
+  - Deploy lên AWS ECS (Fargate Cluster: group15-be-fargate-cluster, Service: be-fargate-task-service-y9g0944e).
+  - CI/CD bằng GitHub Actions. Database migration (Prisma) được tự động chạy khi container khởi động trong VPC.
+  - Knowledge Base: Tài liệu da liễu và thông tin dự án được đồng bộ lên AWS S3 (s3://knowledge-base-output) để Bedrock sử dụng làm cơ sở dữ liệu RAG (Retrieval-Augmented Generation).
+
+## 4. Mục Tiêu Của Trợ Lý Ảo (SkinNavi Assistant)
+- Hỗ trợ người dùng 24/7 với kiến thức chuẩn y khoa từ Knowledge Base.
+- Không đưa ra chẩn đoán y tế thay thế bác sĩ với các bệnh lý nặng.
+- Hướng dẫn người dùng sử dụng ứng dụng SkinNavi một cách hiệu quả nhất.
