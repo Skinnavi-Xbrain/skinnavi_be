@@ -101,21 +101,8 @@ jobs:
           docker push $REGISTRY/$REPO:$TAG
           docker push $REGISTRY/$REPO:latest
 
-      - name: Setup Node for Prisma migrate
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Run Prisma migrate on production RDS
-        env:
-          DATABASE_URL: postgresql://${{ secrets.DB_USERNAME }}:${{ secrets.DB_PASSWORD }}@skinnavi-rds.cjy0ckgcird1.us-west-2.rds.amazonaws.com:5432/skinnavi_db?schema=public
-        run: |
-          npm ci --ignore-scripts
-          npx prisma generate
-          echo "🗄️ Running Prisma migrate deploy on production RDS..."
-          npx prisma migrate deploy
-          echo "✅ Database migration complete!"
+      # NOTE: Prisma migrations run at container startup inside ECS (within the VPC)
+      # The GitHub Actions runner cannot reach the private RDS instance
 
       - name: Download current task definition
         run: |

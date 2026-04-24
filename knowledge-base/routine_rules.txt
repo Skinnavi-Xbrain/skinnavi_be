@@ -1,0 +1,43 @@
+# SkinNavi - Skincare Routine Rules & Guidelines
+
+1. BASIC ROUTINE STRUCTURE
+Morning (AM) - Focus on Protection:
+- Step 1: Cleanser (Gentle)
+- Step 2: Toner / Essence
+- Step 3: Serum (Antioxidant, e.g., Vitamin C)
+- Step 4: Moisturizer
+- Step 5: Sunscreen (Crucial step)
+
+Evening (PM) - Focus on Repair & Treatment:
+- Step 1: Makeup Remover / Double Cleanse
+- Step 2: Cleanser
+- Step 3: Exfoliant (AHA/BHA) / Clay Mask (1-3 times a week, not daily)
+- Step 4: Toner / Essence
+- Step 5: Serum / Treatment (e.g., Retinol, Niacinamide)
+- Step 6: Moisturizer (Can be thicker than AM)
+- Step 7: Spot Treatment (If needed)
+
+2. LAYERING RULES
+- Rule of Consistency: Apply from Thinnest to Thickest (Water-based -> Gel -> Lotion -> Cream -> Oil).
+- Rule of Solubility: Water before Oil.
+- pH Dependency: Apply low pH products (Vitamin C, AHA, BHA) immediately after cleansing, before higher pH products.
+- Wait Times: Wait 15-20 minutes after applying strong actives (AHA, BHA, Retinol) before applying the next step to allow them to work at their optimal pH.
+
+3. INGREDIENT CONFLICTS (DO NOT MIX AT THE SAME TIME)
+- ❌ Retinol + AHA/BHA: Causes severe irritation, dryness, and compromises the skin barrier. (Alternative: Use AHA/BHA in AM and Retinol in PM, or alternate nights).
+- ❌ Vitamin C (L-AA) + Niacinamide (High Concentration): Can cause flushing and potentially diminish the efficacy of Vitamin C. (Alternative: Space out 15-20 mins, or use Vitamin C in AM and Niacinamide in PM).
+- ❌ Retinol + Benzoyl Peroxide: Benzoyl Peroxide can oxidize Retinol, making it less effective, and combining them causes extreme dryness.
+- ❌ Multiple Exfoliants: Avoid using physical scrubs and chemical exfoliants (AHA/BHA) in the same routine.
+
+4. BEST PAIRINGS (SYNERGISTIC EFFECTS)
+- ✅ Vitamin C + Sunscreen: Enhances protection against UV rays and free radicals.
+- ✅ Retinol + Niacinamide: Niacinamide helps soothe the skin and reduce the irritation often caused by Retinol.
+- ✅ Hyaluronic Acid + Moisturizer (Occlusive): Hyaluronic Acid draws moisture in, while the moisturizer locks it into the skin.
+- ✅ AHA/BHA + Hyaluronic Acid: Exfoliating first allows hydrating ingredients to penetrate better.
+
+5. GENERAL GOLDEN RULES
+- Patch Test: Always patch test new products on a small area of skin (jawline or inner arm) for 24-48 hours before full-face application.
+- One at a Time: Introduce only one new product at a time to identify any potential irritants.
+- Sunscreen is Non-Negotiable: Must be applied every day, regardless of weather or indoor/outdoor status.
+- Listen to Your Skin: If your skin is red, peeling, or stinging, stop all actives and focus on hydration and barrier repair.
+- Consistency > Complexity: A simple 3-step routine done daily is more effective than a 10-step routine done inconsistently.

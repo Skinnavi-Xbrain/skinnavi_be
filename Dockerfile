@@ -48,10 +48,13 @@ RUN npx prisma generate
 # Copy ONLY the built "dist" bundle from the builder stage
 COPY --from=builder /app/dist ./dist
 
-# Create start script
+# Create start script that runs migrations then starts the app
+# Migrations run here because ECS is inside the VPC and can reach RDS
 RUN echo "#!/bin/sh" > /app/start.sh && \
     echo "set -e" >> /app/start.sh && \
-    echo "echo \"Starting app...\"" >> /app/start.sh && \
+    echo "echo \"🗄️ Running Prisma migrate deploy...\"" >> /app/start.sh && \
+    echo "npx prisma migrate deploy" >> /app/start.sh && \
+    echo "echo \"✅ Migration complete. Starting app...\"" >> /app/start.sh && \
     echo "node dist/src/main.js" >> /app/start.sh && \
     chmod +x /app/start.sh
 
