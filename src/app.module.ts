@@ -16,6 +16,7 @@ import { AdminModule } from './admin/admin.module';
 import { PackageSubscriptionsModule } from './modules/package-subscriptions/package-subscriptions.module';
 import { UserModule } from './modules/profile-user/user.module';
 import { HealthModule } from './modules/health/health.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { HealthModule } from './modules/health/health.module';
     PackageSubscriptionsModule,
     AdminModule,
     UserModule,
+    ChatbotModule,
   ],
   controllers: [AppController],
   providers: [AppService],
